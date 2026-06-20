@@ -34,5 +34,6 @@ app:
 
 logging:
   level:
-    com.javaprep.backend: INFO
-    org.springframework.security: WARN
+    com.javaprep.backend: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
