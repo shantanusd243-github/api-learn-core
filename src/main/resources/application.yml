@@ -37,3 +37,9 @@ logging:
     com.javaprep.backend: DEBUG
     org.springframework.security: DEBUG
     org.springframework.web: DEBUG
+    org:
+      springframework:
+        data:
+          mongodb:
+            core:
+              MongoTemplate=DEBUG:
