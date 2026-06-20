@@ -31,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -77,20 +79,6 @@ public class QuestionServiceImpl implements QuestionService {
             }
         }
         return dbList;
-    }
-
-    /**
-     * Clears the cache on any Write operation
-     */
-    private void evictCache() {
-        CacheManager cacheManager = cacheManagerProvider.getIfAvailable();
-        if (cacheManager != null) {
-            Cache cache = cacheManager.getCache(CACHE_NAME);
-            if (cache != null) {
-                cache.evict(CACHE_KEY);
-                log.info("🧹 Question cache evicted due to data update.");
-            }
-        }
     }
 
     @Override
@@ -160,23 +148,28 @@ public class QuestionServiceImpl implements QuestionService {
                 ? filtered.subList(start, end)
                 : Collections.emptyList();
 
-        // 5. Extract just the IDs for the 20 questions on the current page
+        // 5. Extract just the IDs for the questions on the current page
         List<String> pageQuestionIds = pageContent.stream()
                 .map(Question::getId)
                 .collect(Collectors.toList());
 
-        // 6. BULK FETCH user data (Only 2 network calls instead of 40!)
-        Set<String> bookmarkedQuestionIds = new HashSet<>();
-        Map<String, String> progressMap = new HashMap<>();
+        // 6. PARALLEL BULK FETCH (O(1) Queries executed simultaneously)
+        Set<String> bookmarkedQuestionIds = ConcurrentHashMap.newKeySet();
+        Map<String, String> progressMap = new ConcurrentHashMap<>();
 
         if (currentUserIdOrNull != null && !pageQuestionIds.isEmpty()) {
-            // Fetch ALL bookmarks for these 20 questions in ONE call
-            bookmarkRepository.findByUserIdAndQuestionIdIn(currentUserIdOrNull, pageQuestionIds)
-                    .forEach(b -> bookmarkedQuestionIds.add(b.getQuestionId()));
+            CompletableFuture<Void> bookmarksFuture = CompletableFuture.runAsync(() -> {
+                bookmarkRepository.findByUserIdAndQuestionIdIn(currentUserIdOrNull, pageQuestionIds)
+                        .forEach(b -> bookmarkedQuestionIds.add(b.getQuestionId()));
+            });
 
-            // Fetch ALL progress states for these 20 questions in ONE call
-            userProgressRepository.findByUserIdAndQuestionIdIn(currentUserIdOrNull, pageQuestionIds)
-                    .forEach(p -> progressMap.put(p.getQuestionId(), p.getStatus().name()));
+            CompletableFuture<Void> progressFuture = CompletableFuture.runAsync(() -> {
+                userProgressRepository.findByUserIdAndQuestionIdIn(currentUserIdOrNull, pageQuestionIds)
+                        .forEach(p -> progressMap.put(p.getQuestionId(), p.getStatus().name()));
+            });
+
+            // Wait for both network calls to finish at the same time
+            CompletableFuture.allOf(bookmarksFuture, progressFuture).join();
         }
 
         // 7. Map and Enrich instantly from RAM (0 database calls in this loop)
