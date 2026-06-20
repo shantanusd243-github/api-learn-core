@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -100,6 +101,11 @@ public class QuestionController {
         } catch (IllegalStateException e) {
             return null;
         }
+    }
+
+    @GetMapping("/metadata")
+    public ResponseEntity<Map<String, List<String>>> getMetadata() {
+        return ResponseEntity.ok(questionService.getFilterMetadata());
     }
 
     @GetMapping("/topics")

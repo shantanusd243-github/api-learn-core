@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 
 public interface QuestionService {
 
@@ -29,4 +30,6 @@ public interface QuestionService {
     QuestionResponse getRandomForMockInterview(String currentUserIdOrNull, List<String> excludeIds);
 
     List<String> getAllTopics();
+
+    Map<String, List<String>> getFilterMetadata();
 }

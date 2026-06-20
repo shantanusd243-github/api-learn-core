@@ -23,9 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -157,11 +155,40 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public List<String> getAllTopics() {
-        return questionRepository.findAll().stream()
-                .map(Question::getTopic)
-                .filter(topic -> topic != null && !topic.trim().isEmpty())
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        // THE FIX: Only fetch topics where the question is a THEORY question!
+        Query query = new Query();
+        query.addCriteria(Criteria.where("questionType").is(QuestionType.THEORY));
+
+        List<String> topics = mongoTemplate.findDistinct(query, "topic", Question.class, String.class);
+        topics.removeIf(t -> t == null || t.trim().isEmpty());
+        Collections.sort(topics);
+        return topics;
     }
+
+    @Override
+    public Map<String, List<String>> getFilterMetadata() {
+        Map<String, List<String>> meta = new HashMap<>();
+
+        // Dynamically fetch unique values directly from the database
+        meta.put("weeks", getDistinctSorted("week", QuestionType.DSA));
+        meta.put("categories", getDistinctSorted("category", QuestionType.SYSTEM_DESIGN));
+        meta.put("tags", getDistinctSorted("tags", null)); // Get all tags across all types
+        meta.put("difficulties", getDistinctSorted("difficulty", null));
+        meta.put("priorities", getDistinctSorted("priority", null));
+
+        return meta;
+    }
+
+    // Helper method to keep code clean
+    private List<String> getDistinctSorted(String field, QuestionType type) {
+        Query query = new Query();
+        if (type != null) {
+            query.addCriteria(Criteria.where("questionType").is(type));
+        }
+        List<String> list = mongoTemplate.findDistinct(query, field, Question.class, String.class);
+        list.removeIf(v -> v == null || v.trim().isEmpty());
+        Collections.sort(list);
+        return list;
+    }
+
 }
