@@ -2,6 +2,7 @@ package com.javaprep.backend.service;
 
 import com.javaprep.backend.dto.question.QuestionRequest;
 import com.javaprep.backend.dto.question.QuestionResponse;
+import com.javaprep.backend.entity.Question;
 import com.javaprep.backend.entity.QuestionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,4 +35,6 @@ public interface QuestionService {
     Map<String, List<String>> getFilterMetadata();
 
     void clearGlobalQuestionCache();
+
+    List<Question> getAllQuestionsForCache();
 }

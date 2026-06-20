@@ -8,6 +8,7 @@ import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.repository.QuestionRepository;
 import com.javaprep.backend.repository.UserProgressRepository;
 import com.javaprep.backend.service.ProgressService;
+import com.javaprep.backend.service.QuestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class ProgressServiceImpl implements ProgressService {
 
     private final UserProgressRepository userProgressRepository;
     private final QuestionRepository questionRepository;
+    private final QuestionService questionService;
 
     @Override
     @Transactional
@@ -56,14 +58,19 @@ public class ProgressServiceImpl implements ProgressService {
 
     @Override
     public DashboardSummaryResponse getDashboardSummary(String userId) {
-        long totalQuestions = questionRepository.count();
 
-        // Safe topic counts (Global data - always works)
-        Map<String, Long> topicCounts = questionRepository.findAll().stream()
+        // 2. INSTANT O(0) RAM FETCH: No database hit at all!
+        // (Make sure QuestionService has the getAllQuestionsForCache method public)
+        List<Question> allQuestions = questionService.getAllQuestionsForCache();
+
+        long totalQuestions = allQuestions.size();
+
+        // 3. INSTANT GROUPING IN RAM (Calculated exactly once)
+        Map<String, Long> topicCounts = allQuestions.stream()
                 .filter(q -> q.getTopic() != null && !q.getTopic().trim().isEmpty())
                 .collect(Collectors.groupingBy(Question::getTopic, Collectors.counting()));
 
-        // If it's a guest, return zeros for personal stats
+        // If it's a guest, return instantly
         if (userId == null) {
             return DashboardSummaryResponse.builder()
                     .totalQuestions(totalQuestions)
@@ -74,25 +81,24 @@ public class ProgressServiceImpl implements ProgressService {
                     .build();
         }
 
-        // 1. Fetch user's progress records
+        // 4. Fetch user's progress records (This is the ONLY database query in the whole method)
+        // Ensure you have an Index on { "userId": 1 } in MongoDB for this collection!
         List<UserProgress> userProgressList = userProgressRepository.findByUserId(userId);
 
-        // 2. Safely count statuses (Handles enums dynamically via .name())
-        long confidentCount = userProgressList.stream()
-                .filter(p -> p.getStatus() != null && p.getStatus().name().equalsIgnoreCase("CONFIDENT"))
-                .count();
+        // 5. Single-pass counting (O(N) instead of O(3N))
+        long confidentCount = 0;
+        long revisingCount = 0;
+        long weakCount = 0;
 
-        long revisingCount = userProgressList.stream()
-                .filter(p -> p.getStatus() != null && p.getStatus().name().equalsIgnoreCase("REVISING"))
-                .count();
-
-        long weakCount = userProgressList.stream()
-                .filter(p -> p.getStatus() != null && p.getStatus().name().equalsIgnoreCase("WEAK"))
-                .count();
-
-        topicCounts = questionRepository.findAll().stream()
-                .filter(q -> q.getTopic() != null && !q.getTopic().trim().isEmpty())
-                .collect(Collectors.groupingBy(Question::getTopic, Collectors.counting()));
+        for (UserProgress p : userProgressList) {
+            if (p.getStatus() != null) {
+                switch (p.getStatus().name().toUpperCase()) {
+                    case "CONFIDENT": confidentCount++; break;
+                    case "REVISING": revisingCount++; break;
+                    case "WEAK": weakCount++; break;
+                }
+            }
+        }
 
         return DashboardSummaryResponse.builder()
                 .totalQuestions(totalQuestions)
