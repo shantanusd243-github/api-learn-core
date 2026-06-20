@@ -217,6 +217,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "allQuestions", allEntries = true)
     public QuestionResponse create(QuestionRequest request, String adminUserId) {
         Question question = questionMapper.toEntity(request);
         question.setCreatedBy(adminUserId);
@@ -225,12 +226,12 @@ public class QuestionServiceImpl implements QuestionService {
         question.setUpdatedAt(Instant.now());
         question = questionRepository.save(question);
 
-        clearGlobalQuestionCache(); // Keep cache fresh
         return questionMapper.toResponse(question);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "allQuestions", allEntries = true)
     public QuestionResponse update(String id, QuestionRequest request, String adminUserId) {
         Question existing = questionRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Question", id));
@@ -241,18 +242,17 @@ public class QuestionServiceImpl implements QuestionService {
 
         existing = questionRepository.save(existing);
 
-        clearGlobalQuestionCache(); // Keep cache fresh
         return questionMapper.toResponse(existing);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "allQuestions", allEntries = true)
     public void delete(String id, String adminUserId) {
         if (!questionRepository.existsById(id)) {
             throw ResourceNotFoundException.of("Question", id);
         }
         questionRepository.deleteById(id);
-        clearGlobalQuestionCache(); // Keep cache fresh
     }
 
     @Override
