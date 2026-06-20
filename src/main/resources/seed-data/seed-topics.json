@@ -1,0 +1,170 @@
+[
+  {
+    "name": "Core Java",
+    "icon": null,
+    "description": null,
+    "displayOrder": 0
+  },
+  {
+    "name": "Java 8",
+    "icon": null,
+    "description": null,
+    "displayOrder": 1
+  },
+  {
+    "name": "Collections",
+    "icon": null,
+    "description": null,
+    "displayOrder": 2
+  },
+  {
+    "name": "Multithreading",
+    "icon": null,
+    "description": null,
+    "displayOrder": 3
+  },
+  {
+    "name": "String",
+    "icon": null,
+    "description": null,
+    "displayOrder": 4
+  },
+  {
+    "name": "OOP",
+    "icon": null,
+    "description": null,
+    "displayOrder": 5
+  },
+  {
+    "name": "Design Patterns",
+    "icon": null,
+    "description": null,
+    "displayOrder": 6
+  },
+  {
+    "name": "Spring Boot",
+    "icon": null,
+    "description": null,
+    "displayOrder": 7
+  },
+  {
+    "name": "REST APIs",
+    "icon": null,
+    "description": null,
+    "displayOrder": 8
+  },
+  {
+    "name": "Exception Handling",
+    "icon": null,
+    "description": null,
+    "displayOrder": 9
+  },
+  {
+    "name": "Microservices",
+    "icon": null,
+    "description": null,
+    "displayOrder": 10
+  },
+  {
+    "name": "SQL",
+    "icon": null,
+    "description": null,
+    "displayOrder": 11
+  },
+  {
+    "name": "Angular",
+    "icon": null,
+    "description": null,
+    "displayOrder": 12
+  },
+  {
+    "name": "Security",
+    "icon": null,
+    "description": null,
+    "displayOrder": 13
+  },
+  {
+    "name": "Week 1",
+    "icon": null,
+    "description": null,
+    "displayOrder": 14
+  },
+  {
+    "name": "Week 2",
+    "icon": null,
+    "description": null,
+    "displayOrder": 15
+  },
+  {
+    "name": "Week 3",
+    "icon": null,
+    "description": null,
+    "displayOrder": 16
+  },
+  {
+    "name": "Week 4",
+    "icon": null,
+    "description": null,
+    "displayOrder": 17
+  },
+  {
+    "name": "Week 5",
+    "icon": null,
+    "description": null,
+    "displayOrder": 18
+  },
+  {
+    "name": "Week 6",
+    "icon": null,
+    "description": null,
+    "displayOrder": 19
+  },
+  {
+    "name": "Week 7",
+    "icon": null,
+    "description": null,
+    "displayOrder": 20
+  },
+  {
+    "name": "Week 8",
+    "icon": null,
+    "description": null,
+    "displayOrder": 21
+  },
+  {
+    "name": "Infrastructure",
+    "icon": null,
+    "description": null,
+    "displayOrder": 22
+  },
+  {
+    "name": "Storage",
+    "icon": null,
+    "description": null,
+    "displayOrder": 23
+  },
+  {
+    "name": "Real-time",
+    "icon": null,
+    "description": null,
+    "displayOrder": 24
+  },
+  {
+    "name": "Social",
+    "icon": null,
+    "description": null,
+    "displayOrder": 25
+  },
+  {
+    "name": "Commerce",
+    "icon": null,
+    "description": null,
+    "displayOrder": 26
+  },
+  {
+    "name": "AI",
+    "icon": null,
+    "description": null,
+    "displayOrder": 27
+  }
+]

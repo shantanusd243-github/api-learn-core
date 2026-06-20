@@ -1,0 +1,38 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: javaprep-backend
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb+srv://Shantanu:Shantanu%401981998@cluster0.qobcxmt.mongodb.net/learn}
+
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-key-change-in-production-must-be-at-least-256-bits-long-xxxxxxxxxx}
+    access-token-expiration-ms: ${JWT_ACCESS_EXP_MS:900000}        # 15 minutes
+    refresh-token-expiration-ms: ${JWT_REFRESH_EXP_MS:604800000}   # 7 days
+    issuer: javaprep-backend
+
+  admin:
+    bootstrap-email: ${ADMIN_BOOTSTRAP_EMAIL:admin@javaprep.local}
+    bootstrap-password: ${ADMIN_BOOTSTRAP_PASSWORD:Admin@12345}
+
+logging:
+  level:
+    com.javaprep.backend: INFO
+    org.springframework.security: WARN

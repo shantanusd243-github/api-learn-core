@@ -1,0 +1,290 @@
+[
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "Why is String immutable?",
+    "answer": "Thread safety, String pool reuse, security (class loading, network), cached hashCode.",
+    "displayOrder": 0
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "HashMap collision resolution",
+    "answer": "LinkedList per bucket (Java 7). Treeified to Red-Black Tree when >8 entries (Java 8+).",
+    "displayOrder": 1
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "ArrayList vs LinkedList",
+    "answer": "ArrayList: O(1) get, O(n) insert. LinkedList: O(1) head/tail insert, O(n) get. Prefer ArrayList.",
+    "displayOrder": 2
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "volatile vs synchronized",
+    "answer": "volatile: visibility only. synchronized: visibility + mutual exclusion. Use volatile for flags only.",
+    "displayOrder": 3
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "Singleton thread safety",
+    "answer": "Bill Pugh (static inner class) or Enum singleton. Both JVM-guaranteed thread-safe.",
+    "displayOrder": 4
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "final, finally, finalize()",
+    "answer": "final: constant/non-overridable. finally: always executes. finalize(): deprecated GC callback.",
+    "displayOrder": 5
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "static keyword",
+    "answer": "Belongs to class, not instance. Cannot override (only hide). Cannot access non-static members directly.",
+    "displayOrder": 6
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "== vs .equals()",
+    "answer": "==: reference equality. equals(): logical equality. Always use equals() for String and objects.",
+    "displayOrder": 7
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "Checked vs Unchecked",
+    "answer": "Checked: must handle (IOException). Unchecked: extends RuntimeException (NPE, IAE).",
+    "displayOrder": 8
+  },
+  {
+    "category": "coreJava",
+    "categoryLabel": "Core Java Essentials",
+    "categoryIcon": "☕",
+    "question": "Serialization",
+    "answer": "Implement Serializable. transient = skip field. Always define serialVersionUID.",
+    "displayOrder": 9
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Lambda syntax",
+    "answer": "(a, b) -> a + b. Zero args: () -> x. Block: (a) -> { return a*2; }",
+    "displayOrder": 10
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "4 core FunctionalInterfaces",
+    "answer": "Predicate<T> (→boolean), Function<T,R> (T→R), Consumer<T> (→void), Supplier<T> (()→T)",
+    "displayOrder": 11
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Intermediate vs terminal",
+    "answer": "Intermediate (filter,map,sorted): lazy. Terminal (collect,count,forEach): triggers execution.",
+    "displayOrder": 12
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Optional best practices",
+    "answer": "ofNullable() for nullable. orElse()/orElseThrow(). Never get() without isPresent(). Never store null in Optional.",
+    "displayOrder": 13
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Stream vs Collection",
+    "answer": "Stream: no storage, single-use, lazy. Collection: stores data, multi-use, eager.",
+    "displayOrder": 14
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Date-Time API",
+    "answer": "LocalDate/Time/DateTime (no zone). ZonedDateTime (with zone). Instant (epoch time). All immutable.",
+    "displayOrder": 15
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Method references",
+    "answer": "Static: ClassName::method. Instance: obj::method. Constructor: ClassName::new.",
+    "displayOrder": 16
+  },
+  {
+    "category": "java8",
+    "categoryLabel": "Java 8 Quick Facts",
+    "categoryIcon": "🚀",
+    "question": "Default methods in interface",
+    "answer": "Allow adding methods to interfaces without breaking existing implementations.",
+    "displayOrder": 17
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "@SpringBootApplication",
+    "answer": "= @Configuration + @EnableAutoConfiguration + @ComponentScan",
+    "displayOrder": 18
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "@RestController vs @Controller",
+    "answer": "@RestController = @Controller + @ResponseBody. Returns JSON directly.",
+    "displayOrder": 19
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "@Transactional pitfall",
+    "answer": "Self-invocation bypasses proxy. Private methods not intercepted. Checked exceptions don't rollback by default.",
+    "displayOrder": 20
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "@PathVariable vs @RequestParam",
+    "answer": "PathVariable: /users/{id} — required. RequestParam: /users?role=X — optional.",
+    "displayOrder": 21
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "Bean scopes",
+    "answer": "Singleton (default), Prototype (new each time), Request, Session, Application.",
+    "displayOrder": 22
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "Caching annotations",
+    "answer": "@EnableCaching, @Cacheable (read), @CachePut (update), @CacheEvict (delete).",
+    "displayOrder": 23
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "Actuator endpoints",
+    "answer": "/health, /metrics, /env, /loggers, /beans, /threaddump.",
+    "displayOrder": 24
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "Profiles",
+    "answer": "application-{profile}.yml. Activate: spring.profiles.active=prod or env var.",
+    "displayOrder": 25
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "Exception handling",
+    "answer": "@ControllerAdvice + @ExceptionHandler → centralized. Catch specific before generic.",
+    "displayOrder": 26
+  },
+  {
+    "category": "spring",
+    "categoryLabel": "Spring Boot Quick Hits",
+    "categoryIcon": "🍃",
+    "question": "Auto-configuration",
+    "answer": "@ConditionalOnClass / @ConditionalOnMissingBean triggers config based on classpath/beans.",
+    "displayOrder": 27
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "API Gateway",
+    "answer": "Single entry point. Routes to microservices. Handles auth, rate limiting, logging, LB.",
+    "displayOrder": 28
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "Circuit Breaker states",
+    "answer": "CLOSED (normal) → OPEN (failing, reject) → HALF_OPEN (probe). Tool: Resilience4j.",
+    "displayOrder": 29
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "Saga Pattern",
+    "answer": "Distributed tx via choreography (events) or orchestration (coordinator). Compensating transactions for rollback.",
+    "displayOrder": 30
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "CQRS",
+    "answer": "Separate Command (write) and Query (read) models. Scale reads independently.",
+    "displayOrder": 31
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "DB per Service",
+    "answer": "Each service owns its DB. No shared DB. Cross-service queries via API or events.",
+    "displayOrder": 32
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "Event-Driven",
+    "answer": "Kafka/RabbitMQ for async. Loose coupling, scalable. Tradeoff: eventual consistency.",
+    "displayOrder": 33
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "Service Registry",
+    "answer": "Services register on startup. Clients discover via registry (Eureka, Consul).",
+    "displayOrder": 34
+  },
+  {
+    "category": "micro",
+    "categoryLabel": "Microservices Patterns",
+    "categoryIcon": "🔗",
+    "question": "Strangler Fig",
+    "answer": "Gradually migrate monolith to microservices. Proxy routes old→monolith, new→microservice.",
+    "displayOrder": 35
+  }
+]
