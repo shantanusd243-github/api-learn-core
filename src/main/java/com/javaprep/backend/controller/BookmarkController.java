@@ -1,11 +1,14 @@
 package com.javaprep.backend.controller;
 
 import com.javaprep.backend.dto.bookmark.BookmarkResponse;
+import com.javaprep.backend.dto.question.QuestionResponse;
 import com.javaprep.backend.security.CurrentUser;
+import com.javaprep.backend.security.UserPrincipal;
 import com.javaprep.backend.service.BookmarkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,5 +35,10 @@ public class BookmarkController {
     public ResponseEntity<Void> remove(@PathVariable String questionId) {
         bookmarkService.removeBookmark(CurrentUser.id(), questionId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/details")
+    public ResponseEntity<List<QuestionResponse>> getBookmarkedQuestionsDetails(@AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(bookmarkService.getBookmarkedQuestionsDetails(currentUser.getId()));
     }
 }

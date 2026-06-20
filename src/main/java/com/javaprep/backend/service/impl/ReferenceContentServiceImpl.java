@@ -8,6 +8,8 @@ import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.repository.ReferenceContentRepository;
 import com.javaprep.backend.service.ReferenceContentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,12 +21,14 @@ public class ReferenceContentServiceImpl implements ReferenceContentService {
     private final ReferenceContentRepository referenceContentRepository;
 
     @Override
+    @Cacheable(value = "referenceContent", key = "'all'")
     public List<ReferenceContentResponse> listAll() {
         return referenceContentRepository.findAllByOrderByDisplayOrderAsc()
                 .stream().map(this::toResponse).toList();
     }
 
     @Override
+    @Cacheable(value = "referenceContent", key = "#pageKey")
     public ReferenceContentResponse getByPageKey(String pageKey) {
         ReferenceContent content = referenceContentRepository.findByPageKey(pageKey)
                 .orElseThrow(() -> ResourceNotFoundException.of("ReferenceContent", pageKey));
@@ -32,6 +36,7 @@ public class ReferenceContentServiceImpl implements ReferenceContentService {
     }
 
     @Override
+    @CacheEvict(value = "referenceContent", allEntries = true)
     public ReferenceContentResponse create(ReferenceContentRequest request, String adminUserId) {
         if (referenceContentRepository.existsByPageKey(request.getPageKey())) {
             throw new DuplicateResourceException(
@@ -50,6 +55,7 @@ public class ReferenceContentServiceImpl implements ReferenceContentService {
     }
 
     @Override
+    @CacheEvict(value = "referenceContent", allEntries = true)
     public ReferenceContentResponse update(String pageKey, ReferenceContentRequest request, String adminUserId) {
         ReferenceContent content = referenceContentRepository.findByPageKey(pageKey)
                 .orElseThrow(() -> ResourceNotFoundException.of("ReferenceContent", pageKey));
@@ -65,6 +71,7 @@ public class ReferenceContentServiceImpl implements ReferenceContentService {
     }
 
     @Override
+    @CacheEvict(value = "referenceContent", allEntries = true)
     public void delete(String pageKey) {
         ReferenceContent content = referenceContentRepository.findByPageKey(pageKey)
                 .orElseThrow(() -> ResourceNotFoundException.of("ReferenceContent", pageKey));

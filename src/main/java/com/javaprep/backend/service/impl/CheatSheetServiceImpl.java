@@ -7,6 +7,8 @@ import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.repository.CheatSheetItemRepository;
 import com.javaprep.backend.service.CheatSheetService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -21,6 +23,7 @@ public class CheatSheetServiceImpl implements CheatSheetService {
     private final CheatSheetItemRepository cheatSheetItemRepository;
 
     @Override
+    @Cacheable(value = "cheatSheet", key = "'grouped'")
     public Map<String, List<CheatSheetItemResponse>> listGroupedByCategory() {
         List<CheatSheetItem> all = cheatSheetItemRepository.findAllByOrderByDisplayOrderAsc();
         Map<String, List<CheatSheetItemResponse>> grouped = new LinkedHashMap<>();
@@ -32,12 +35,14 @@ public class CheatSheetServiceImpl implements CheatSheetService {
     }
 
     @Override
+    @Cacheable(value = "cheatSheet", key = "'all'")
     public List<CheatSheetItemResponse> listAll() {
         return cheatSheetItemRepository.findAllByOrderByDisplayOrderAsc()
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
+    @CacheEvict(value = "cheatSheet", allEntries = true)
     public CheatSheetItemResponse create(CheatSheetItemRequest request) {
         CheatSheetItem item = CheatSheetItem.builder()
                 .category(request.getCategory())
@@ -51,6 +56,7 @@ public class CheatSheetServiceImpl implements CheatSheetService {
     }
 
     @Override
+    @CacheEvict(value = "cheatSheet", allEntries = true)
     public CheatSheetItemResponse update(String id, CheatSheetItemRequest request) {
         CheatSheetItem item = cheatSheetItemRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("CheatSheetItem", id));
@@ -64,6 +70,7 @@ public class CheatSheetServiceImpl implements CheatSheetService {
     }
 
     @Override
+    @CacheEvict(value = "cheatSheet", allEntries = true)
     public void delete(String id) {
         if (!cheatSheetItemRepository.existsById(id)) {
             throw ResourceNotFoundException.of("CheatSheetItem", id);
