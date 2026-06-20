@@ -15,6 +15,7 @@ import com.javaprep.backend.mapper.QuestionMapper;
 import com.javaprep.backend.repository.AdminAuditLogRepository;
 import com.javaprep.backend.repository.QuestionRepository;
 import com.javaprep.backend.repository.QuestionSubmissionRequestRepository;
+import com.javaprep.backend.service.QuestionService;
 import com.javaprep.backend.service.QuestionSubmissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,6 +33,7 @@ public class QuestionSubmissionServiceImpl implements QuestionSubmissionService 
     private final QuestionRepository questionRepository;
     private final AdminAuditLogRepository auditLogRepository;
     private final QuestionMapper questionMapper;
+    private final QuestionService questionService;
 
     @Override
     @Transactional
@@ -94,6 +96,7 @@ public class QuestionSubmissionServiceImpl implements QuestionSubmissionService 
 
         logAudit(adminUserId, "APPROVE_REQUEST", "QuestionSubmissionRequest", requestId,
                 "Published as Question id=" + question.getId());
+        questionService.clearGlobalQuestionCache();
 
         return toResponse(request);
     }
@@ -177,4 +180,5 @@ public class QuestionSubmissionServiceImpl implements QuestionSubmissionService 
                 .updatedAt(r.getUpdatedAt())
                 .build();
     }
+
 }

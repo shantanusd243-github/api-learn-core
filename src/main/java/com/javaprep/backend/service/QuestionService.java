@@ -32,4 +32,6 @@ public interface QuestionService {
     List<String> getAllTopics();
 
     Map<String, List<String>> getFilterMetadata();
+
+    void clearGlobalQuestionCache();
 }
