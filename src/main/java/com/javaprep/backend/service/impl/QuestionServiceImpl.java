@@ -160,11 +160,34 @@ public class QuestionServiceImpl implements QuestionService {
                 ? filtered.subList(start, end)
                 : Collections.emptyList();
 
-        // 5. Map and Enrich (Only executes ~10 DB calls instead of a full table scan)
+        // 5. Extract just the IDs for the 20 questions on the current page
+        List<String> pageQuestionIds = pageContent.stream()
+                .map(Question::getId)
+                .collect(Collectors.toList());
+
+        // 6. BULK FETCH user data (Only 2 network calls instead of 40!)
+        Set<String> bookmarkedQuestionIds = new HashSet<>();
+        Map<String, String> progressMap = new HashMap<>();
+
+        if (currentUserIdOrNull != null && !pageQuestionIds.isEmpty()) {
+            // Fetch ALL bookmarks for these 20 questions in ONE call
+            bookmarkRepository.findByUserIdAndQuestionIdIn(currentUserIdOrNull, pageQuestionIds)
+                    .forEach(b -> bookmarkedQuestionIds.add(b.getQuestionId()));
+
+            // Fetch ALL progress states for these 20 questions in ONE call
+            userProgressRepository.findByUserIdAndQuestionIdIn(currentUserIdOrNull, pageQuestionIds)
+                    .forEach(p -> progressMap.put(p.getQuestionId(), p.getStatus().name()));
+        }
+
+        // 7. Map and Enrich instantly from RAM (0 database calls in this loop)
         List<QuestionResponse> responses = pageContent.stream()
                 .map(q -> {
                     QuestionResponse r = questionMapper.toResponse(q);
-                    enrichWithUserContext(r, currentUserIdOrNull);
+                    if (currentUserIdOrNull != null) {
+                        // Look up the answers from our HashMaps in 0 milliseconds
+                        r.setBookmarked(bookmarkedQuestionIds.contains(q.getId()));
+                        r.setUserProgressStatus(progressMap.get(q.getId()));
+                    }
                     return r;
                 })
                 .collect(Collectors.toList());

@@ -10,4 +10,5 @@ public interface UserProgressRepository extends MongoRepository<UserProgress, St
     List<UserProgress> findByUserId(String userId);
     Optional<UserProgress> findByUserIdAndQuestionId(String userId, String questionId);
     long countByUserIdAndStatus(String userId, UserProgress.ProgressStatus status);
+    List<UserProgress> findByUserIdAndQuestionIdIn(String userId, List<String> questionIds);
 }
