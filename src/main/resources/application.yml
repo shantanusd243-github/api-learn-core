@@ -6,10 +6,11 @@ spring:
     name: javaprep-backend
   mail:
     host: smtp.gmail.com
-    port: 587
+    port: 465
     username: ${SMTP_USERNAME}
     password: ${SMTP_PASSWORD}
     properties:
+      debug: true
       mail:
         smtp:
           auth: true
