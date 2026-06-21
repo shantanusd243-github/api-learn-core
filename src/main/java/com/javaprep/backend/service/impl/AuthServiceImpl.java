@@ -1,28 +1,36 @@
 package com.javaprep.backend.service.impl;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.javaprep.backend.config.AdminBootstrapProperties;
 import com.javaprep.backend.dto.auth.AuthResponse;
 import com.javaprep.backend.dto.auth.LoginRequest;
 import com.javaprep.backend.dto.auth.RegisterRequest;
+import com.javaprep.backend.entity.PasswordResetToken;
 import com.javaprep.backend.entity.Role;
 import com.javaprep.backend.entity.User;
-import com.javaprep.backend.exception.DuplicateResourceException;
-import com.javaprep.backend.exception.InvalidCredentialsException;
-import com.javaprep.backend.exception.InvalidRefreshTokenException;
-import com.javaprep.backend.exception.ResourceNotFoundException;
+import com.javaprep.backend.exception.*;
+import com.javaprep.backend.repository.PasswordResetTokenRepository;
 import com.javaprep.backend.repository.UserRepository;
 import com.javaprep.backend.security.JwtService;
 import com.javaprep.backend.service.AuthService;
+import com.javaprep.backend.service.EmailService;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +41,14 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AdminBootstrapProperties adminBootstrapProperties;
+    private final PasswordResetTokenRepository tokenRepository;
+    private final EmailService emailService;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
+    @Value("${app.google.client-id}")
+    private String googleClientId;
 
     @Override
     @Transactional
@@ -149,5 +165,92 @@ public class AuthServiceImpl implements AuthService {
                 .email(user.getEmail())
                 .roles(user.getRoles().stream().map(Enum::name).collect(Collectors.toSet()))
                 .build();
+    }
+
+    @Override
+    public void forgotPassword(String email) {
+        // ADDED .toLowerCase() here!
+        userRepository.findByEmail(email.toLowerCase()).ifPresent(user -> {
+
+            tokenRepository.deleteByUserId(user.getId());
+
+            String token = UUID.randomUUID().toString();
+            PasswordResetToken resetToken = PasswordResetToken.builder()
+                    .token(token)
+                    .user(user)
+                    .expiryDate(Instant.now().plus(1, ChronoUnit.HOURS))
+                    .build();
+
+            tokenRepository.save(resetToken);
+
+            String resetLink = frontendUrl + "/reset-password?token=" + token;
+
+            emailService.sendEmail(user.getEmail(), "Password Reset Request",
+                    "Click here to reset your password. This link expires in 1 hour: \n" + resetLink);
+        });
+    }
+
+    @Override
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = tokenRepository.findByToken(token)
+                .orElseThrow(() -> new InvalidStateException("Invalid or expired token"));
+
+        if (resetToken.isExpired()) {
+            tokenRepository.delete(resetToken);
+            throw new InvalidStateException("Token has expired");
+        }
+
+        // FIXED: Fetch the real, un-proxied user from the DB using the proxy's ID
+        String userId = resetToken.getUser().getId();
+        User realUser = userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidStateException("User not found"));
+
+        // Update the password hash on the REAL user object
+        realUser.setPasswordHash(passwordEncoder.encode(newPassword));
+
+        // Save the updated user back to Mongo (this will now properly execute an UPDATE)
+        userRepository.save(realUser);
+
+        // Cleanup token after successful use
+        tokenRepository.delete(resetToken);
+    }
+
+    @Override
+    public AuthResponse googleLogin(String idTokenString) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(idTokenString);
+            if (idToken == null) throw new InvalidCredentialsException("Invalid Google Token");
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+
+            // Find existing user in Mongo, or create a new one
+            User user = userRepository.findByEmail(email).orElseGet(() -> {
+                User newUser = new User();
+                newUser.setEmail(email);
+
+                // FIXED: Using setName and setRoles to match your User entity
+                newUser.setName(name);
+                newUser.setRoles(Collections.singleton(Role.USER));
+                newUser.setEnabled(true);
+                newUser.setCreatedAt(Instant.now());
+
+                // Assign a random 128-bit UUID as a password so they can't log in via normal email/password
+                newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+                return userRepository.save(newUser);
+            });
+
+            // FIXED: We just reuse your amazing issueTokens method directly!
+            // This handles creating the access token, the refresh token, AND hashing it into the database!
+            return issueTokens(user);
+
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Google authentication failed");
+        }
     }
 }

@@ -10,4 +10,7 @@ public interface AuthService {
     AuthResponse refresh(String refreshToken);
     void logout(String userId);
     AuthResponse.UserSummary getCurrentUser(String userId);
+    void forgotPassword(String email);
+    void resetPassword(String token, String newPassword);
+    AuthResponse googleLogin(String idTokenString);
 }

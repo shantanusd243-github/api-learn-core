@@ -4,6 +4,18 @@ server:
 spring:
   application:
     name: javaprep-backend
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
 
   data:
     mongodb:
@@ -20,7 +32,11 @@ management:
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,https://learnin-prep.vercel.app}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID}
+  frontend:
+    url: ${FRONTEND_URL:https://learnin-prep.vercel.app} # Used for generating reset links
 
   jwt:
     secret: ${JWT_SECRET}
