@@ -66,10 +66,10 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedTopics() {
-       /* if (topicRepository.count() > 0) {
+        if (topicRepository.count() > 0) {
             log.info("Topics already seeded, skipping.");
             return;
-        }*/
+        }
         Optional<List<Map<String, Object>>> raw = readJsonArray("seed-data/seed-topics.json");
         if (raw.isEmpty()) return;
 
@@ -87,10 +87,10 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedTags() {
-        /*if (tagRepository.count() > 0) {
+        if (tagRepository.count() > 0) {
             log.info("Tags already seeded, skipping.");
             return;
-        }*/
+        }
         Optional<List<Map<String, Object>>> raw = readJsonArray("seed-data/seed-tags.json");
         if (raw.isEmpty()) return;
 
@@ -124,10 +124,10 @@ public class DataSeeder implements CommandLineRunner {
 
     @SuppressWarnings("unchecked")
     private void seedQuestions() {
-        /*if (questionRepository.count() > 0) {
+        if (questionRepository.count() > 0) {
             log.info("Questions already seeded, skipping.");
             return;
-        }*/
+        }
         Optional<List<Map<String, Object>>> rawOpt = readJsonArray("seed-data/seed-questions.json");
         if (rawOpt.isEmpty()) return;
         List<Map<String, Object>> raw = rawOpt.get();
