@@ -8,29 +8,39 @@ import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.repository.ReferenceContentRepository;
 import com.javaprep.backend.service.ReferenceContentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReferenceContentServiceImpl implements ReferenceContentService {
 
     private final ReferenceContentRepository referenceContentRepository;
 
-    @Override
-    @Cacheable(value = "referenceContent", key = "'all'")
-    public List<ReferenceContentResponse> listAll() {
-        return referenceContentRepository.findAllByOrderByDisplayOrderAsc()
-                .stream().map(this::toResponse).toList();
+    @Cacheable(value = "referenceContent", key = "'globalList'")
+    public List<ReferenceContent> getAllForCache() {
+        log.info("🔥 Loading all Reference Content into JVM RAM...");
+        return referenceContentRepository.findAll();
     }
 
     @Override
-    @Cacheable(value = "referenceContent", key = "#pageKey")
+    public List<ReferenceContentResponse> listAll() {
+        return getAllForCache().stream()
+                .sorted(Comparator.comparing(ReferenceContent::getDisplayOrder))
+                .map(this::toResponse).toList();
+    }
+
+    @Override
     public ReferenceContentResponse getByPageKey(String pageKey) {
-        ReferenceContent content = referenceContentRepository.findByPageKey(pageKey)
+        ReferenceContent content = getAllForCache().stream()
+                .filter(c -> c.getPageKey().equalsIgnoreCase(pageKey))
+                .findFirst()
                 .orElseThrow(() -> ResourceNotFoundException.of("ReferenceContent", pageKey));
         return toResponse(content);
     }

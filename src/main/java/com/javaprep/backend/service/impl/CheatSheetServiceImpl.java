@@ -7,25 +7,36 @@ import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.repository.CheatSheetItemRepository;
 import com.javaprep.backend.service.CheatSheetService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CheatSheetServiceImpl implements CheatSheetService {
 
     private final CheatSheetItemRepository cheatSheetItemRepository;
 
+    @Cacheable(value = "cheatSheet", key = "'globalList'")
+    public List<CheatSheetItem> getAllForCache() {
+        log.info("🔥 Loading all Cheat Sheets into JVM RAM...");
+        return cheatSheetItemRepository.findAll();
+    }
+
     @Override
-    @Cacheable(value = "cheatSheet", key = "'grouped'")
     public Map<String, List<CheatSheetItemResponse>> listGroupedByCategory() {
-        List<CheatSheetItem> all = cheatSheetItemRepository.findAllByOrderByDisplayOrderAsc();
+        List<CheatSheetItem> all = getAllForCache().stream()
+                .sorted(Comparator.comparing(CheatSheetItem::getDisplayOrder))
+                .toList();
+
         Map<String, List<CheatSheetItemResponse>> grouped = new LinkedHashMap<>();
         for (CheatSheetItem item : all) {
             grouped.computeIfAbsent(item.getCategory(), k -> new java.util.ArrayList<>())
