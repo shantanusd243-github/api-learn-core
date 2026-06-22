@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Map;
 public class EmailServiceImpl implements EmailService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final TemplateEngine templateEngine; // Inject Thymeleaf
 
     @Value("${spring.mail.password}")
     private String brevoApiKey;
@@ -28,12 +31,32 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    // Configurable app name (defaults to "Learnin Prep" if missing in application.yml)
+    @Value("${spring.mail.application}")
+    private String appName;
+
+    @Async
+    @Override
+    public void sendPasswordResetEmail(String to, String resetLink) {
+        // 1. Prepare variables for the HTML template
+        Context context = new Context();
+        context.setVariable("resetLink", resetLink);
+        context.setVariable("appName", appName);
+
+        // 2. Process the HTML template
+        String htmlBody = templateEngine.process("email/reset-password", context);
+        String subject = "Reset Your Password - " + appName;
+
+        // 3. Send it
+        sendEmail(to, subject, htmlBody);
+    }
+
     @Async
     @Override
     public void sendEmail(String to, String subject, String body) {
+        // ... (Keep your exact same Brevo API logic here from the previous step) ...
         try {
             String url = "https://api.brevo.com/v3/smtp/email";
-
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("api-key", brevoApiKey);
@@ -41,7 +64,7 @@ public class EmailServiceImpl implements EmailService {
             Map<String, Object> requestBody = new HashMap<>();
 
             Map<String, String> sender = new HashMap<>();
-            sender.put("name", "Learnin Prep");
+            sender.put("name", appName); // Use configurable app name
             sender.put("email", fromEmail);
             requestBody.put("sender", sender);
 
@@ -50,15 +73,12 @@ public class EmailServiceImpl implements EmailService {
             requestBody.put("to", List.of(recipient));
 
             requestBody.put("subject", subject);
-            requestBody.put("htmlContent", body); // Use "textContent" if you aren't sending HTML
+            requestBody.put("htmlContent", body);
 
-            // 3. Make the API Call
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
-            String response = restTemplate.postForObject(url, request, String.class);
-
-            log.info("Email sent successfully to {} via Brevo API. Response: {}", to, response);
+            restTemplate.postForObject(url, request, String.class);
         } catch (Exception e) {
-            log.error("Failed to send email to {} via Brevo API. Error: {}", to, e.getMessage());
+            log.error("Failed to send email to {}", to, e);
         }
     }
 }

@@ -169,7 +169,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void forgotPassword(String email) {
-        // ADDED .toLowerCase() here!
         userRepository.findByEmail(email.toLowerCase()).ifPresent(user -> {
 
             tokenRepository.deleteByUserId(user.getId());
@@ -185,8 +184,8 @@ public class AuthServiceImpl implements AuthService {
 
             String resetLink = frontendUrl + "/reset-password?token=" + token;
 
-            emailService.sendEmail(user.getEmail(), "Password Reset Request",
-                    "Click here to reset your password. This link expires in 1 hour: \n" + resetLink);
+            // Clean, semantic, and decoupled
+            emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
         });
     }
 
