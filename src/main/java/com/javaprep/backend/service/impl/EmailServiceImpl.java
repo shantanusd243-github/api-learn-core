@@ -32,7 +32,7 @@ public class EmailServiceImpl implements EmailService {
     private String fromEmail;
 
     // Configurable app name (defaults to "Learnin Prep" if missing in application.yml)
-    @Value("${spring.application.application}")
+    @Value("${spring.application.name}")
     private String appName;
 
     @Async
