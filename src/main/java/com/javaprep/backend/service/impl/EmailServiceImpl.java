@@ -22,7 +22,7 @@ public class EmailServiceImpl implements EmailService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${EMAIL_API_KEY}")
+    @Value("${spring.mail.password}")
     private String brevoApiKey;
 
     @Value("${spring.mail.username}")
