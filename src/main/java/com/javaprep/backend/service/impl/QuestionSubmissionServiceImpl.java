@@ -9,15 +9,20 @@ import com.javaprep.backend.entity.Question;
 import com.javaprep.backend.entity.QuestionStatus;
 import com.javaprep.backend.entity.QuestionSubmissionRequest;
 import com.javaprep.backend.entity.RequestStatus;
+import com.javaprep.backend.event.QuestionApprovedEvent;
+import com.javaprep.backend.event.QuestionBroadcastEvent;
+import com.javaprep.backend.event.QuestionSubmittedEvent;
 import com.javaprep.backend.exception.InvalidStateException;
 import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.mapper.QuestionMapper;
 import com.javaprep.backend.repository.AdminAuditLogRepository;
 import com.javaprep.backend.repository.QuestionRepository;
 import com.javaprep.backend.repository.QuestionSubmissionRequestRepository;
+import com.javaprep.backend.repository.UserRepository;
 import com.javaprep.backend.service.QuestionService;
 import com.javaprep.backend.service.QuestionSubmissionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +39,8 @@ public class QuestionSubmissionServiceImpl implements QuestionSubmissionService 
     private final AdminAuditLogRepository auditLogRepository;
     private final QuestionMapper questionMapper;
     private final QuestionService questionService;
+    private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -53,7 +60,14 @@ public class QuestionSubmissionServiceImpl implements QuestionSubmissionService 
                 .updatedAt(Instant.now())
                 .build();
 
-        return toResponse(requestRepository.save(request));
+        QuestionSubmissionRequest savedRequest = requestRepository.save(request);
+
+        // FIRE EVENT: Triggers the "Question Submitted" emails to User and Admin
+        userRepository.findById(userId).ifPresent(user ->
+                eventPublisher.publishEvent(new QuestionSubmittedEvent(user, savedRequest))
+        );
+
+        return toResponse(savedRequest);
     }
 
     @Override
@@ -86,19 +100,32 @@ public class QuestionSubmissionServiceImpl implements QuestionSubmissionService 
         question.setUpdatedBy(adminUserId);
         question.setCreatedAt(Instant.now());
         question.setUpdatedAt(Instant.now());
-        question = questionRepository.save(question);
+
+        // 1. FIX: Assign to a new, effectively final variable
+        Question savedQuestion = questionRepository.save(question);
 
         request.setStatus(RequestStatus.APPROVED);
         request.setReviewedByUserId(adminUserId);
-        request.setResultingQuestionId(question.getId());
+        request.setResultingQuestionId(savedQuestion.getId());
         request.setUpdatedAt(Instant.now());
-        request = requestRepository.save(request);
+
+        // 2. FIX: Assign to a new, effectively final variable
+        QuestionSubmissionRequest savedRequest = requestRepository.save(request);
 
         logAudit(adminUserId, "APPROVE_REQUEST", "QuestionSubmissionRequest", requestId,
-                "Published as Question id=" + question.getId());
+                "Published as Question id=" + savedQuestion.getId());
         questionService.clearGlobalQuestionCache();
 
-        return toResponse(request);
+        // FIRE EVENTS: Triggers the "Question Approved" email to the submitter
+        // Note we are using savedRequest and savedQuestion here now!
+        userRepository.findById(savedRequest.getSubmittedByUserId()).ifPresent(submitter ->
+                eventPublisher.publishEvent(new QuestionApprovedEvent(submitter.getEmail(), submitter.getName(), savedQuestion.getTitle()))
+        );
+
+        // FIRE EVENTS: Triggers the "New Question Added" broadcast to everyone
+        eventPublisher.publishEvent(new QuestionBroadcastEvent(savedQuestion));
+
+        return toResponse(savedRequest);
     }
 
     @Override

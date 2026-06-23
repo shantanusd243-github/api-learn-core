@@ -1,3 +1,3 @@
 package com.javaprep.backend.event;
 
-public record QuestionApprovedEvent(String userEmail, String questionTitle) {}
+public record QuestionApprovedEvent(String userEmail,String userName, String questionTitle) {}
