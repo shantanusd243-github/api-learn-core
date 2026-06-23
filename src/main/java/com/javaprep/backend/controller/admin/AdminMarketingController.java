@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -32,6 +33,7 @@ public class AdminMarketingController {
     private Resource promoTemplateResource;
 
     private String promoTemplate;
+    private final String PROMO_SUBJECT = "Got 10 minutes today? (Or you gonna choke in the next interview too?)";
 
     @PostConstruct
     public void loadTemplate() {
@@ -45,22 +47,46 @@ public class AdminMarketingController {
     }
 
     /**
+     * SAFE LOCAL TEST: Sends the promo email to a single specific address.
+     * Example: POST /api/admin/marketing/test-promo?email=mytest@gmail.com&name=Shantanu
+     */
+    @PostMapping("/test-promo")
+    public ResponseEntity<String> testPromoBlast(
+            @RequestParam String email,
+            @RequestParam(defaultValue = "Local Tester") String name) {
+
+        try {
+            // Replace the placeholder with the test name
+            String personalizedHtml = promoTemplate.replace("{{userName}}", name);
+
+            // Send the email
+            emailService.sendEmail(email, PROMO_SUBJECT, personalizedHtml);
+
+            log.info("Test promo email sent to: {}", email);
+            return ResponseEntity.ok("Test email successfully sent to " + email);
+        } catch (Exception e) {
+            log.error("Failed to send test promo email to: " + email, e);
+            return ResponseEntity.internalServerError().body("Failed to send test email: " + e.getMessage());
+        }
+    }
+
+    /**
      * DANGER: This will send an email to EVERY user in the database.
      * Ensure this endpoint is secured behind Admin role checks.
      */
     @PostMapping("/send-promo")
     public ResponseEntity<String> sendPromoBlast() {
         List<User> users = userRepository.findAll();
-        String subject = "Got 10 minutes today? (Or you gonna choke in the next interview too?)";
-
         int successCount = 0;
 
         for (User user : users) {
             try {
-                // If you want to inject the user's name into the promo later, you can use .replace() here
-                // String personalizedHtml = promoTemplate.replace("{{userName}}", user.getName() != null ? user.getName() : "Developer");
-                
-                emailService.sendEmail(user.getEmail(), subject, promoTemplate);
+                String userName = (user.getName() != null && !user.getName().trim().isEmpty())
+                        ? user.getName()
+                        : "there";
+
+                String personalizedHtml = promoTemplate.replace("{{userName}}", userName);
+                emailService.sendEmail(user.getEmail(), PROMO_SUBJECT, personalizedHtml);
                 successCount++;
             } catch (Exception e) {
                 log.error("Failed to send promo email to: " + user.getEmail(), e);
