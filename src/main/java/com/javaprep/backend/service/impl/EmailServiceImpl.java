@@ -81,4 +81,15 @@ public class EmailServiceImpl implements EmailService {
             log.error("Failed to send email to {}", to, e);
         }
     }
+
+    @Async
+    @Override
+    public void sendDashboardReadyEmail(String to, String dashboardUrl) {
+        Context context = new Context();
+        context.setVariable("dashboardUrl", dashboardUrl);
+        context.setVariable("appName", appName);
+        String htmlBody = templateEngine.process("email/dashboard-ready", context);
+        String subject = "Your Personalized Interview Attack Plan is Ready!";
+        sendEmail(to, subject, htmlBody);
+    }
 }
