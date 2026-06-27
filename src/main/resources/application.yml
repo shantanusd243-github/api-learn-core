@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: Learnin prep
+  domain:
+    url: ${DOMAIN_URL}
   mail:
     username: ${SMTP_USERNAME}
     password: ${SMTP_PASSWORD}
