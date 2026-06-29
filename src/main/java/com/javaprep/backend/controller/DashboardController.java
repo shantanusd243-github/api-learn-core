@@ -1,6 +1,7 @@
 package com.javaprep.backend.controller;
 
 import com.javaprep.backend.dto.dashboard.JdAnalysisResponse;
+import com.javaprep.backend.security.UserPrincipal;
 import com.javaprep.backend.service.JdAnalysisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +13,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/dashboard")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*") // Match this to your CorsProperties configuration
+@CrossOrigin(origins = "*")
 public class DashboardController {
 
     private final JdAnalysisService jdAnalysisService;
@@ -21,13 +22,22 @@ public class DashboardController {
     public ResponseEntity<?> analyzeJd(@RequestBody Map<String, String> request, Principal principal) {
         String jdText = request.get("jobDescription");
         String userId = principal.getName();
-        if (jdText == null || jdText.trim().isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
 
-        jdAnalysisService.processAndSaveJdAsync(userId, jdText);
-        return ResponseEntity.accepted().body("Analysis started. You will be notified via email.");
+        try {
+            // THIS is where it gets called!
+            // It validates the character limit, checks the daily quota,
+            // and saves the JD to the MongoDB Queue.
+            jdAnalysisService.submitJdForAnalysis(userId, jdText);
+
+            // Instantly return 200 OK to the frontend while the Cron Job handles the rest.
+            return ResponseEntity.accepted().body(Map.of("message", "Analysis started. You will be notified via email."));
+
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // If validation or quota fails, return 400 Bad Request to trigger the React popup.
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
+
     @GetMapping("/ai-plan")
     public ResponseEntity<JdAnalysisResponse> getAiPlan(Principal principal) {
         JdAnalysisResponse plan = jdAnalysisService.getLatestPlan(principal.getName());

@@ -11,6 +11,8 @@ public class JdAnalysisResponse {
     private List<RadarItem> radarData;
     private List<String> expectations;
     private List<FocusArea> focusAreas;
+    private boolean validJd;
+    private String failureMessage;
 
     @Data
     public static class RadarItem {

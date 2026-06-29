@@ -92,4 +92,21 @@ public class EmailServiceImpl implements EmailService {
         String subject = "Your Personalized Interview Attack Plan is Ready!";
         sendEmail(to, subject, htmlBody);
     }
+
+    @Async
+    @Override
+    public void sendSpamRejectionEmail(String to, String reason) {
+        // 1. Prepare variables for the HTML template
+        Context context = new Context();
+        context.setVariable("reason", reason);
+        context.setVariable("appName", appName);
+
+        // 2. Process the HTML template
+        String htmlBody = templateEngine.process("email/spam-rejection", context);
+        String subject = "Action Required: Your Job Description Analysis Failed - " + appName;
+
+        // 3. Send it using your existing Brevo logic
+        sendEmail(to, subject, htmlBody);
+        log.info("Spam rejection email triggered for {}", to);
+    }
 }

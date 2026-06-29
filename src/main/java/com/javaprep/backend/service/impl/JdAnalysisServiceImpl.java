@@ -15,6 +15,14 @@ import com.javaprep.backend.repository.TopicRepository;
 import com.javaprep.backend.service.EmailService;
 import com.javaprep.backend.service.JdAnalysisService;
 import com.javaprep.backend.service.UserService;
+import com.javaprep.backend.entity.JdAnalysisQueue;
+import com.javaprep.backend.entity.UserJdQuota;
+import com.javaprep.backend.repository.JdAnalysisQueueRepository;
+import com.javaprep.backend.repository.UserJdQuotaRepository;
+import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,13 +44,17 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
     private final AiJdPlanRepository aiJdPlanRepository;
     private final EmailService emailService;
     private final UserService userService;
-
-    // Inject your shiny new config class!
+    private final JdAnalysisQueueRepository queueRepository;
+    private final UserJdQuotaRepository quotaRepository;
     private final AiProperties aiProperties;
+    private final UserJdQuotaRepository userJdQuotaRepository;
+    private final JdAnalysisQueueRepository jdAnalysisQueueRepository;
 
-    // We keep this one as @Value because it's under the "groq.api.key" prefix, not "app.ai"
     @Value("${groq.api.key}")
     private String groqApiKey;
+
+    @Value("${app.ai.max-daily-requests}")
+    private Integer maxDailyRequests;
 
     @Override
     public JdAnalysisResponse analyzeJobDescription(String jobDescriptionText) {
@@ -91,19 +103,37 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
         }
     }
 
-    @Async
     @Override
-    public void processAndSaveJdAsync(String userId, String jdText) {
-        JdAnalysisResponse plan = analyzeJobDescription(jdText);
+    public void processAndSaveJdAsync(JdAnalysisQueue job) {
+        try {
+            JdAnalysisResponse plan = analyzeJobDescription(job.getJdText());
+            User user = userService.findById(job.getUserId());
 
-        AiJdPlan entity = new AiJdPlan();
-        entity.setUserId(userId);
-        entity.setPlanData(plan);
-        entity.setCreatedAt(LocalDateTime.now());
-        aiJdPlanRepository.save(entity);
+            if (!plan.isValidJd()) {
+                // SPAM DETECTED!
+                log.warn("Junk JD detected for user {}. Deleting from queue.", job.getUserId());
+                jdAnalysisQueueRepository.delete(job); // Delete the scrap
+                emailService.sendSpamRejectionEmail(user.getEmail(), plan.getFailureMessage()); // Send rejection mail
+                return;
+            }
 
-        User user = userService.findById(userId);
-        emailService.sendDashboardReadyEmail(user.getEmail(), "https://learnin-prep.vercel.app/dashboard");
+            // 2. VALID JD: Save to Dashboard
+            AiJdPlan entity = new AiJdPlan();
+            entity.setUserId(job.getUserId());
+            entity.setPlanData(plan);
+            entity.setCreatedAt(LocalDateTime.now());
+            aiJdPlanRepository.save(entity);
+
+            // 3. SUCCESS: Delete from queue and notify user
+            jdAnalysisQueueRepository.delete(job);
+            emailService.sendDashboardReadyEmail(user.getEmail(), "https://learnin-prep.vercel.app/dashboard");
+
+        } catch (Exception e) {
+            // 4. API FAILED (Traffic/Timeout): Mark as FAILED to retry later
+            log.error("AI API failed for user {}. Marking for retry.", job.getUserId(), e);
+            job.setStatus("FAILED");
+            jdAnalysisQueueRepository.save(job);
+        }
     }
 
     @Override
@@ -111,5 +141,44 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
         return aiJdPlanRepository.findTopByUserIdOrderByCreatedAtDesc(userId)
                 .map(AiJdPlan::getPlanData)
                 .orElse(null); // Return null if no plan exists
+    }
+
+    @Override
+    public void submitJdForAnalysis(String userId, String jdText) {
+        // 1. Backend Character Limit Check (Point 5)
+        if (jdText == null || jdText.trim().length() < 200 || jdText.trim().length() > 8000) {
+            throw new IllegalArgumentException("Job Description must be between 200 and 8000 characters.");
+        }
+
+        // 2. Check Daily Quota (Point 4)
+        UserJdQuota quota = quotaRepository.findById(userId).orElse(new UserJdQuota());
+
+        if (quota.getUserId() == null) {
+            quota.setUserId(userId);
+            quota.setRequestsToday(0);
+            quota.setLastRequestDate(LocalDate.now());
+        }
+
+        // Reset count if it's a new day
+        if (!quota.getLastRequestDate().isEqual(LocalDate.now())) {
+            quota.setRequestsToday(0);
+            quota.setLastRequestDate(LocalDate.now());
+        }
+
+        // Block if they hit the limit
+        if (quota.getRequestsToday() >= maxDailyRequests) {
+            throw new IllegalStateException("You have reached your daily limit of " + maxDailyRequests + " JD analyses. Please try again tomorrow.");
+        }
+
+        // 3. Increment Quota & Save
+        quota.setRequestsToday(quota.getRequestsToday() + 1);
+        quotaRepository.save(quota);
+
+        // 4. Save to Processing Queue (Point 3)
+        JdAnalysisQueue job = new JdAnalysisQueue();
+        job.setUserId(userId);
+        job.setJdText(jdText);
+        job.setCreatedAt(LocalDateTime.now());
+        queueRepository.save(job);
     }
 }

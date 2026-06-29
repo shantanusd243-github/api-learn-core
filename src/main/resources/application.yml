@@ -55,6 +55,7 @@ app:
       max-tokens: 2500
       top-p: 1.0
       reasoning-effort: "medium"
+    max-daily-requests: ${MAX_DAILY_REQUESTS:3}
 
   jwt:
     secret: ${JWT_SECRET}
