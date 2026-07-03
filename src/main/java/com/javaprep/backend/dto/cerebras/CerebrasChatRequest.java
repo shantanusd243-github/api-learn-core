@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -14,6 +15,8 @@ public class CerebrasChatRequest {
     private Integer maxCompletionTokens;
     
     private Double temperature;
+
+    private Map<String, String> response_format;
     
     @JsonProperty("top_p")
     private Double topP;

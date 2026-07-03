@@ -14,5 +14,6 @@ public class AiJdPlan {
     private String id;
     private String userId; // Foreign Key
     private JdAnalysisResponse planData; // Your existing DTO
+    private Boolean isActive;
     private LocalDateTime createdAt;
 }

@@ -1,6 +1,7 @@
 package com.javaprep.backend.controller;
 
 import com.javaprep.backend.dto.dashboard.JdAnalysisResponse;
+import com.javaprep.backend.dto.dashboard.JdHistoryItemDto;
 import com.javaprep.backend.security.UserPrincipal;
 import com.javaprep.backend.service.JdAnalysisService;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -42,5 +44,22 @@ public class DashboardController {
     public ResponseEntity<JdAnalysisResponse> getAiPlan(Principal principal) {
         JdAnalysisResponse plan = jdAnalysisService.getLatestPlan(principal.getName());
         return plan != null ? ResponseEntity.ok(plan) : ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/jd-history")
+    public ResponseEntity<List<JdHistoryItemDto>> getJdHistory(Principal principal) {
+        List<JdHistoryItemDto> history = jdAnalysisService.getJdHistory(principal.getName());
+        return ResponseEntity.ok(history);
+    }
+
+    // NEW: Switch active JD
+    @PostMapping("/jd-history/{planId}/activate")
+    public ResponseEntity<?> activateJdPlan(@PathVariable String planId, Principal principal) {
+        try {
+            jdAnalysisService.activateJdPlan(principal.getName(), planId);
+            return ResponseEntity.ok(Map.of("message", "JD Activated Successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Failed to activate JD"));
+        }
     }
 }

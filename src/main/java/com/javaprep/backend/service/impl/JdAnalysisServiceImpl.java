@@ -7,6 +7,7 @@ import com.javaprep.backend.config.AiProperties;
 import com.javaprep.backend.dto.cerebras.CerebrasChatRequest;
 import com.javaprep.backend.dto.cerebras.CerebrasChatResponse;
 import com.javaprep.backend.dto.dashboard.JdAnalysisResponse;
+import com.javaprep.backend.dto.dashboard.JdHistoryItemDto;
 import com.javaprep.backend.dto.groq.GroqChatRequest;
 import com.javaprep.backend.dto.groq.GroqChatResponse;
 import com.javaprep.backend.dto.groq.GroqMessage;
@@ -34,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
@@ -93,54 +95,54 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
     @Override
     public JdAnalysisResponse analyzeJobDescription(String jobDescriptionText) {
         Map<QuestionType, List<String>> topicMap = questionService.getAvailableTopicsMap();
-        String topicsJson = new ObjectMapper().writeValueAsString(topicMap);
+        String topicsJson = buildTopicMappingString(topicMap);
 
         String promptTemplate = aiProperties.getPrompts().getJdAnalysis();
         if (promptTemplate == null || promptTemplate.isEmpty()) {
             throw new IllegalStateException("AI Prompt is missing! Check application.yml indentation.");
         }
 
-        String finalSystemPrompt = String.format(promptTemplate, topicsJson);
+        String finalPrompt = String.format(promptTemplate, topicsJson, jobDescriptionText);
 
         // ROUND-ROBIN TOGGLE
         boolean currentStrategyIsGroqFirst = useGroqFirst.getAndSet(!useGroqFirst.get()); // Flip for the next request
 
         // EXECUTE STRATEGY
         if (currentStrategyIsGroqFirst) {
-            return executeGroqPrimary(finalSystemPrompt, jobDescriptionText);
+            return executeGroqPrimary(finalPrompt);
         } else {
-            return executeCerebrasPrimary(finalSystemPrompt, jobDescriptionText);
+            return executeCerebrasPrimary(finalPrompt);
         }
     }
 
-    private JdAnalysisResponse executeGroqPrimary(String systemPrompt, String jdText) {
+    private JdAnalysisResponse executeGroqPrimary(String systemPrompt) {
         try {
-            return callGroq(systemPrompt, jdText);
+            return callGroq(systemPrompt);
         } catch (Exception e) {
             log.warn("Groq primary failed ({}). Attempting Gemini fallback...", e.getMessage());
             // If this also fails, it will bubble up automatically to the scheduler
             try {
-                return callCerebrasFallback(systemPrompt, jdText);
+                return callCerebrasFallback(systemPrompt);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
         }
     }
 
-    private JdAnalysisResponse executeCerebrasPrimary(String systemPrompt, String jdText) {
+    private JdAnalysisResponse executeCerebrasPrimary(String systemPrompt) {
         try {
-            return callCerebrasFallback(systemPrompt, jdText);
+            return callCerebrasFallback(systemPrompt);
         } catch (Exception e) {
             log.warn("Cerebras primary failed ({}). Attempting Groq fallback...", e.getMessage());
             try {
-                return callGroq(systemPrompt, jdText);
+                return callGroq(systemPrompt);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
         }
     }
 
-    private JdAnalysisResponse callGroq(String systemPrompt, String jdText) throws Exception {
+    private JdAnalysisResponse callGroq(String systemPrompt) throws Exception {
         if (!aiLimitSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
             throw new RuntimeException("AI provider is currently at max capacity (rate limit protected).");
         }
@@ -152,9 +154,9 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
                     .top_p(aiProperties.getGroq().getTopP())
                     .reasoning_effort(aiProperties.getGroq().getReasoningEffort())
                     .stream(false)
+                    .response_format(new HashMap<>(Map.of("type", "json_object")))
                     .messages(List.of(
-                            new GroqMessage("system", systemPrompt),
-                            new GroqMessage("user", "Job Description: \n" + jdText)
+                            new GroqMessage("user", systemPrompt)
                     ))
                     .build();
 
@@ -170,12 +172,11 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
         }
     }
 
-    private JdAnalysisResponse callCerebrasFallback(String systemPrompt, String jdText) throws Exception {
+    private JdAnalysisResponse callCerebrasFallback(String systemPrompt) throws Exception {
         if (!aiLimitSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
             throw new RuntimeException("AI provider is currently at max capacity (rate limit protected).");
         }
         try {
-            String fullPrompt = systemPrompt + "\n\nJob Description:\n" + jdText;
 
             CerebrasChatRequest request = CerebrasChatRequest.builder()
                     .model(aiProperties.getCerebras().getModel())
@@ -184,10 +185,11 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
                     .topP(aiProperties.getCerebras().getTopP())
                     .stream(false)
                     .reasoningEffort(aiProperties.getCerebras().getReasoningEffort())
+                    .response_format(new HashMap<>(Map.of("type", "json_object")))
                     .messages(List.of(
                             CerebrasChatRequest.Message.builder()
                                     .role("user")
-                                    .content(fullPrompt)
+                                    .content(systemPrompt)
                                     .build()
                     ))
                     .build();
@@ -224,6 +226,12 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
                 return;
             }
 
+            List<AiJdPlan> existingPlans = aiJdPlanRepository.findAllByUserIdOrderByCreatedAtDesc(job.getUserId());
+            existingPlans.forEach(p -> p.setIsActive(false));
+            if (!existingPlans.isEmpty()) {
+                aiJdPlanRepository.saveAll(existingPlans);
+            }
+
             // 2. VALID JD: Save to Dashboard
             AiJdPlan entity = new AiJdPlan();
             entity.setUserId(job.getUserId());
@@ -238,7 +246,7 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
         } catch (Exception e) {
             log.error("AI API failed for user {}. Status: {}", job.getUserId(), job.getStatus());
 
-            if ("FAILED".equals(job.getStatus()) || job.getRetryCount() >= 1) {
+            if ("FAILED".equals(job.getStatus()) || job.getRetryCount() > 2) {
                 // 2nd Failure or already retried: Give up and notify user
                 jdAnalysisQueueRepository.delete(job);
                 emailService.sendFailedRejectionEmail(userService.findById(job.getUserId()).getEmail());
@@ -254,15 +262,17 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
 
     @Override
     public JdAnalysisResponse getLatestPlan(String userId) {
-        return aiJdPlanRepository.findTopByUserIdOrderByCreatedAtDesc(userId)
+        return aiJdPlanRepository.findByUserIdAndIsActiveTrue(userId)
+                .or(() -> aiJdPlanRepository.findTopByUserIdOrderByCreatedAtDesc(userId))
                 .map(AiJdPlan::getPlanData)
                 .map(jdPlan -> {
                     if (jdPlan.getRadarData() != null) {
+                        // Keep your existing sorting
                         jdPlan.getRadarData().sort(Comparator.comparing(JdAnalysisResponse.RadarItem::getLevel));
                     }
                     return jdPlan;
                 })
-                .orElse(null); // Return null if no plan exists
+                .orElse(null);
     }
 
     @Override
@@ -317,5 +327,60 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
                 log.info("Quota re-credited for user: {}", userId);
             }
         });
+    }
+
+    @Override
+    public List<JdHistoryItemDto> getJdHistory(String userId) {
+        List<AiJdPlan> plans = aiJdPlanRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+
+        return plans.stream().map(plan -> {
+            JdAnalysisResponse planData = plan.getPlanData();
+
+            // Extract top 3 skills from the radar data
+            List<String> topSkills = java.util.Collections.emptyList();
+            if (planData != null && planData.getRadarData() != null) {
+                topSkills = planData.getRadarData().stream()
+                        .limit(3)
+                        .map(item -> item.getTopic()) // Assuming radar item has getTopic() based on your JS
+                        .collect(Collectors.toList());
+            }
+
+            return JdHistoryItemDto.builder()
+                    .id(plan.getId())
+                    .role(planData != null ? planData.getRole() : "Target Role")
+                    .company(null) // You can map company here if you add it to the AI prompt/JdAnalysisResponse later
+                    .createdAt(plan.getCreatedAt())
+                    .topSkills(topSkills)
+                    .isActive(Boolean.TRUE.equals(plan.getIsActive()))
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    // NEW: Switch the active plan
+    @Override
+    public void activateJdPlan(String userId, String planId) {
+        List<AiJdPlan> userPlans = aiJdPlanRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+        boolean updated = false;
+
+        for (AiJdPlan plan : userPlans) {
+            boolean isTarget = plan.getId().equals(planId);
+            // Only update DB if state actually changes
+            if (!Boolean.valueOf(isTarget).equals(plan.getIsActive())) {
+                plan.setIsActive(isTarget);
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            aiJdPlanRepository.saveAll(userPlans);
+        }
+    }
+
+    private String buildTopicMappingString(Map<QuestionType, List<String>> topicMapping) {
+        StringBuilder sb = new StringBuilder();
+        topicMapping.forEach((module, topics) ->
+                sb.append(module).append(": ").append(String.join(", ", topics)).append("\n")
+        );
+        return sb.toString().trim();
     }
 }
