@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -20,11 +21,11 @@ public class JdQueueProcessorServiceImpl implements JdQueueProcessorService {
     private final JdAnalysisService jdAnalysisService; // Your existing service
 
     @Override
-    @Scheduled(fixedDelay = 10000) // 10 seconds
+    @Scheduled(fixedDelay = 15000) // 5 seconds
     public void processPendingJobs() {
-        Optional<JdAnalysisQueue> jobOpt = queueRepository.findFirstByStatusOrderByCreatedAtAsc("PENDING");
-        if (jobOpt.isPresent()) {
-            jdAnalysisService.processAndSaveJdAsync(jobOpt.get());
+        List<JdAnalysisQueue> pendingJobs = queueRepository.findTop3ByStatusOrderByCreatedAtAsc("PENDING");
+        for (JdAnalysisQueue job : pendingJobs) {
+            jdAnalysisService.processAndSaveJdAsync(job);
         }
     }
 

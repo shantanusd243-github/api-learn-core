@@ -2,16 +2,13 @@ package com.javaprep.backend.service.impl;
 
 import com.javaprep.backend.dto.question.QuestionRequest;
 import com.javaprep.backend.dto.question.QuestionResponse;
-import com.javaprep.backend.entity.Question;
-import com.javaprep.backend.entity.QuestionStatus;
-import com.javaprep.backend.entity.QuestionType;
-import com.javaprep.backend.entity.UserProgress;
+import com.javaprep.backend.entity.*;
+import com.javaprep.backend.enums.Priority;
 import com.javaprep.backend.exception.ResourceNotFoundException;
 import com.javaprep.backend.mapper.QuestionMapper;
-import com.javaprep.backend.repository.BookmarkRepository;
-import com.javaprep.backend.repository.QuestionRepository;
-import com.javaprep.backend.repository.UserProgressRepository;
+import com.javaprep.backend.repository.*;
 import com.javaprep.backend.service.QuestionService;
+import com.javaprep.backend.service.QuestionValidationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -47,6 +44,9 @@ public class QuestionServiceImpl implements QuestionService {
     private final UserProgressRepository userProgressRepository;
     private final QuestionMapper questionMapper;
     private final MongoTemplate mongoTemplate;
+    private final QuestionValidationService validationService;
+    private final MappingRepository mappingRepository;
+    private final TopicRepository topicRepository;
 
     // Safely injects cache manager if available, preventing startup crashes
     private final ObjectProvider<CacheManager> cacheManagerProvider;
@@ -101,7 +101,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Page<QuestionResponse> search(QuestionType questionType, String topic, String category, String difficulty,
-                                         String priority, String tag, String company, String search, String week,
+                                         Priority priority, String tag, String company, String search, String week,
                                          Pageable pageable, String currentUserIdOrNull) {
 
         // 1. Instantly pull from RAM
@@ -114,7 +114,7 @@ public class QuestionServiceImpl implements QuestionService {
         if (topic != null) stream = stream.filter(q -> topic.equalsIgnoreCase(q.getTopic()));
         if (category != null) stream = stream.filter(q -> category.equalsIgnoreCase(q.getCategory()));
         if (difficulty != null) stream = stream.filter(q -> difficulty.equalsIgnoreCase(q.getDifficulty()));
-        if (priority != null) stream = stream.filter(q -> priority.equalsIgnoreCase(q.getPriority()));
+        if (priority != null) stream = stream.filter(q -> q.getPriority() == priority);
 
         if (tag != null) stream = stream.filter(q -> q.getTags() != null &&
                 q.getTags().stream().anyMatch(t -> t.equalsIgnoreCase(tag)));
@@ -224,6 +224,7 @@ public class QuestionServiceImpl implements QuestionService {
         question.setUpdatedBy(adminUserId);
         question.setCreatedAt(Instant.now());
         question.setUpdatedAt(Instant.now());
+        validationService.validateTopicConsistency(question);
         question = questionRepository.save(question);
 
         return questionMapper.toResponse(question);
@@ -315,7 +316,7 @@ public class QuestionServiceImpl implements QuestionService {
                 .collect(Collectors.toList()));
 
         meta.put("difficulties", getDistinctSorted(all, null, Question::getDifficulty));
-        meta.put("priorities", getDistinctSorted(all, null, Question::getPriority));
+        meta.put("priorities", getDistinctSorted(all, null, q -> q.getPriority().name()));
 
         return meta;
     }
@@ -368,5 +369,33 @@ public class QuestionServiceImpl implements QuestionService {
     @CacheEvict(value = "allQuestions", allEntries = true)
     public void clearGlobalQuestionCache() {
         log.info("🧹 Global Question Cache forcefully cleared!");
+    }
+
+    @Override
+    public Map<QuestionType, List<String>> getAvailableTopicsMap() {
+        // 1. Fetch all mappings from the new collection
+        List<QuestionTypeTopicMapping> mappings = mappingRepository.findAll();
+
+        // 2. Fetch all actual topic entities to create a lookup dictionary (ID -> Name)
+        Map<String, String> topicIdToNameMap = topicRepository.findAll()
+                .stream()
+                .collect(Collectors.toMap(
+                        Topic::getId,
+                        Topic::getName
+                ));
+
+        Map<QuestionType, List<String>> result = new HashMap<>();
+
+        // 3. Process the mappings
+        mappings.forEach(mapping -> {
+            // Convert List of IDs (from mapping) to List of Names (using our lookup map)
+            List<String> topicNames = mapping.getTopicIds().stream()
+                    .map(id -> topicIdToNameMap.getOrDefault(id, "DSA"))
+                    .collect(Collectors.toList());
+
+            result.put(mapping.getQuestionType(), topicNames);
+        });
+
+        return result;
     }
 }

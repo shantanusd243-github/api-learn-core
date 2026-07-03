@@ -15,5 +15,6 @@ public class JdAnalysisQueue {
     private String userId;
     private String jdText;
     private String status = "PENDING";
+    private int retryCount = 0;
     private LocalDateTime createdAt;
 }

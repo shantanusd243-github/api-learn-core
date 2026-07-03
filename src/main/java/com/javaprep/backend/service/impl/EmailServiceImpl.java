@@ -109,4 +109,13 @@ public class EmailServiceImpl implements EmailService {
         sendEmail(to, subject, htmlBody);
         log.info("Spam rejection email triggered for {}", to);
     }
+
+    @Async
+    @Override
+    public void sendFailedRejectionEmail(String to) {
+        Context context = new Context();
+        context.setVariable("appName", appName);
+        String htmlBody = templateEngine.process("email/permanent-failure", context);
+        sendEmail(to, "Update: We couldn't process your request", htmlBody);
+    }
 }

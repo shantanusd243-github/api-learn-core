@@ -1,5 +1,6 @@
 package com.javaprep.backend.entity;
 
+import com.javaprep.backend.enums.Priority;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -65,7 +66,7 @@ public class Question {
     private String category; // system design category, or general category for theory
 
     @Indexed
-    private String priority; // Must Know | Important | Nice to Know
+    private Priority priority; // Must Know | Important | Nice to Know
 
     @Indexed
     private String difficulty; // Beginner/Intermediate/Advanced/Senior or Easy/Medium/Hard

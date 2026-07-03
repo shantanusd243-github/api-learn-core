@@ -4,6 +4,7 @@ import com.javaprep.backend.dto.common.PageResponse;
 import com.javaprep.backend.dto.question.QuestionRequest;
 import com.javaprep.backend.dto.question.QuestionResponse;
 import com.javaprep.backend.entity.QuestionType;
+import com.javaprep.backend.enums.Priority;
 import com.javaprep.backend.security.CurrentUser;
 import com.javaprep.backend.service.QuestionService;
 import jakarta.validation.Valid;
@@ -32,7 +33,7 @@ public class QuestionController {
             @RequestParam(required = false) String topic,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String difficulty,
-            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) String tag,
             @RequestParam(required = false) String company,
             @RequestParam(required = false) String search,

@@ -2,6 +2,7 @@ package com.javaprep.backend.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.javaprep.backend.entity.*;
+import com.javaprep.backend.enums.Priority;
 import com.javaprep.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -141,7 +142,7 @@ public class DataSeeder implements CommandLineRunner {
                     .title((String) m.get("title"))
                     .topic((String) m.get("topic"))
                     .category((String) m.get("category"))
-                    .priority((String) m.get("priority"))
+                    .priority((Priority) m.get("priority"))
                     .difficulty((String) m.get("difficulty"))
                     .tags((List<String>) m.getOrDefault("tags", List.of()))
                     .companyAskedIn((List<String>) m.getOrDefault("companyAskedIn", List.of()))

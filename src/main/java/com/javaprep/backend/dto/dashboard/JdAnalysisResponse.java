@@ -1,5 +1,7 @@
 package com.javaprep.backend.dto.dashboard;
 
+import com.javaprep.backend.entity.QuestionType;
+import com.javaprep.backend.enums.Priority;
 import lombok.Data;
 import java.util.List;
 
@@ -17,14 +19,14 @@ public class JdAnalysisResponse {
     @Data
     public static class RadarItem {
         private String topic;
-        private String level;
-        private String module;
+        private Priority level;
+        private QuestionType module;
     }
 
     @Data
     public static class FocusArea {
         private String title;
         private String description;
-        private String module;
+        private QuestionType module;
     }
 }

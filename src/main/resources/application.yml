@@ -38,25 +38,52 @@ app:
     prompts:
       jd-analysis: >
         You are an expert Technical Interview Coach for Java Developers. Analyze the provided Job Description (JD) and map it to my curriculum. 
-        My Available Topics: %s. 
-        Task: Analyze the JD and return a JSON object with these keys: 'role', 'difficulty', 'strategyMessage', 'radarData', 'expectations', 'focusAreas'. 
-        Constraints: Return ONLY valid, minified JSON. Do NOT include markdown code blocks. Ensure all topic names match my Available Topics list exactly. 
-        The 'radarData' key MUST be an array of objects: {"topic": "Topic Name", "level": "Must Know", "module": "THEORY"}. 
+        My Available Topics Mapping: %s. 
+        (This mapping is a JSON object where keys are Modules like "THEORY", "SYSTEM_DESIGN", "DSA", and values are arrays of valid topic strings).
+
+        Task: Analyze the JD and return a JSON object with these keys: 
+        'role', 'difficulty', 'strategyMessage', 'radarData', 'expectations', 'focusAreas', 'validJd' (boolean), 'failureMessage' (string). 
+
+        Constraints: 
+        - Return ONLY valid, minified JSON. 
+        - Do NOT include markdown code blocks.
+        - For 'validJd': Set to 'false' if the JD is junk, spam, too short, or not a real technical job description, and provide a clear 'failureMessage'. Set to 'true' otherwise.
+
+        The 'radarData' key MUST be an array of objects: {"topic": "Exact Topic Name", "level": "MUST_KNOW", "module": "EXACT_MODULE_KEY"}. 
+        The 'focusAreas' key MUST be an array of objects: {"title": "Exact Topic Name", "description": "Short description", "module": "EXACT_MODULE_KEY"}.
+
+        CRITICAL EXPECTATIONS & MISSING SKILLS RULE:
+        The 'expectations' key MUST be an array of 3-4 strings representing senior requirements. IF the JD strongly emphasizes an important technical skill or tool that is NOT present in the Available Topics Mapping, you MUST add it here as one of the expectation strings (e.g., "Requires strong knowledge of Spring Webflux and reactive programming").
+
+        CRITICAL ZERO-HALLUCINATION & EXACT MATCH RULE: 
+        You are STRICTLY FORBIDDEN from inventing new topics for the radarData or focusAreas. You MUST select topics EXACTLY as they appear in the Available Topics Mapping. Pay strict attention to spacing and casing (e.g., if the map says "Spring Boot", you must output "Spring Boot", NEVER "SpringBoot"). If the JD requires a skill that is NOT in the mapping, you must either map it to the closest existing parent topic, or place it in the 'expectations' array as instructed above. 
+
+        CRITICAL MODULE INHERITANCE RULE: 
+        Every item in 'radarData' and 'focusAreas' MUST include the 'module' key. The value of this 'module' key MUST be the exact parent key from the mapping where you found the topic. For example, if you select a topic from the "THEORY" array, its module MUST be "THEORY". You cannot mix and match modules.
+
+        CRITICAL ATOMIC TOPIC RULE: 
+        Never combine, blend, or join multiple topics together using separators like '&', 'and', '/', or ',' (e.g., do NOT create 'Docker & Kubernetes'). Every single entry in 'radarData' and 'focusAreas' must represent exactly ONE standalone topic from the mapping.
+
         CRITICAL RADAR SCORING RULE: Carefully analyze the adjectives and phrasing in the JD to determine the 'level'. 
-        - Use 'Must Know' ONLY for core, primary skills (e.g., 'strong proficiency', 'expert', 'must have'). 
-        - Use 'Important' for secondary daily skills (e.g., 'experience with', 'working knowledge'). 
-        - Use 'Nice to Know' for tertiary skills (e.g., 'familiarity with', 'understanding of', 'bonus', 'plus'). Do not mark everything as 'Must Know'.
-        The 'expectations' key MUST be an array of 3-4 strings representing senior requirements.
-        The 'focusAreas' key MUST be an array of objects: {"title": "Topic Name", "description": "Short description", "module": "THEORY"}.
-        CRITICAL MODULE RULE: Every item in 'radarData' and 'focusAreas' MUST include the 'module' key. Its value MUST be exactly one of: "THEORY", "SYSTEM_DESIGN", or "DSA".
+        - Use 'MUST_KNOW' ONLY for core, primary skills (e.g., 'strong proficiency', 'expert', 'must have'). 
+        - Use 'IMPORTANT' for secondary daily skills (e.g., 'experience with', 'working knowledge'). 
+        - Use 'NICE_TO_KNOW' for tertiary skills (e.g., 'familiarity with', 'understanding of', 'bonus').
     groq:
       model: "openai/gpt-oss-120b"
       temperature: 1.0
-      max-tokens: 2500
+      max-tokens: 2400
       top-p: 1.0
-      reasoning-effort: "medium"
+      reasoning-effort: "low"
+    cerebras:
+      model: "gemma-4-31b"
+      temperature: 1.0
+      max-tokens: 2100
+      top-p: 1.0
+      reasoning-effort: "none"
     max-daily-requests: ${MAX_DAILY_REQUESTS:3}
-
+    concurrency-limit: 3
+    minJdsize: 200
+    maxJdsize: 2500
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiration-ms: ${JWT_ACCESS_EXP_MS:900000}        # 15 minutes
@@ -82,3 +109,7 @@ groq:
   api:
     url: https://api.groq.com/openai/v1
     key: ${GROK_API_KEY} # Replace with ENV var in production
+cerebras:
+  api:
+    url: ${CEREBRAS_API_URL:https://api.cerebras.ai}
+    key: ${CEREBRAS_API_KEY}

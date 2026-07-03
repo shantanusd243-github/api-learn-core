@@ -1,36 +1,44 @@
 package com.javaprep.backend.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.javaprep.backend.client.CerebrasApiClient;
 import com.javaprep.backend.client.GroqApiClient;
 import com.javaprep.backend.config.AiProperties;
+import com.javaprep.backend.dto.cerebras.CerebrasChatRequest;
+import com.javaprep.backend.dto.cerebras.CerebrasChatResponse;
 import com.javaprep.backend.dto.dashboard.JdAnalysisResponse;
 import com.javaprep.backend.dto.groq.GroqChatRequest;
 import com.javaprep.backend.dto.groq.GroqChatResponse;
 import com.javaprep.backend.dto.groq.GroqMessage;
 import com.javaprep.backend.entity.AiJdPlan;
-import com.javaprep.backend.entity.Topic;
+import com.javaprep.backend.entity.QuestionType;
+import com.javaprep.backend.entity.UserJdQuota;
 import com.javaprep.backend.entity.User;
+import com.javaprep.backend.entity.JdAnalysisQueue;
 import com.javaprep.backend.repository.AiJdPlanRepository;
 import com.javaprep.backend.repository.TopicRepository;
 import com.javaprep.backend.service.EmailService;
 import com.javaprep.backend.service.JdAnalysisService;
+import com.javaprep.backend.service.QuestionService;
 import com.javaprep.backend.service.UserService;
-import com.javaprep.backend.entity.JdAnalysisQueue;
-import com.javaprep.backend.entity.UserJdQuota;
 import com.javaprep.backend.repository.JdAnalysisQueueRepository;
 import com.javaprep.backend.repository.UserJdQuotaRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,59 +55,158 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
     private final JdAnalysisQueueRepository queueRepository;
     private final UserJdQuotaRepository quotaRepository;
     private final AiProperties aiProperties;
-    private final UserJdQuotaRepository userJdQuotaRepository;
     private final JdAnalysisQueueRepository jdAnalysisQueueRepository;
+    private final CerebrasApiClient cerebrasApiClient;
+    private final QuestionService questionService;
+    private Semaphore aiLimitSemaphore;
 
     @Value("${groq.api.key}")
     private String groqApiKey;
 
+    @Value("${cerebras.api.key}")
+    private String cerebrasApiKey;
+
     @Value("${app.ai.max-daily-requests}")
     private Integer maxDailyRequests;
 
+    @Value("${app.ai.minJdsize}")
+    private Integer minJdsize;
+
+    @Value("${app.ai.maxJdsize}")
+    private Integer maxJdsize;
+
+    @Value("app.frontend.url")
+    private String frontendUrl;
+
+    @Value("${app.ai.concurrency-limit}")
+    private int concurrencyLimit;
+
+    @PostConstruct
+    public void init() {
+        this.aiLimitSemaphore = new Semaphore(concurrencyLimit);
+    }
+
+
+    private final AtomicBoolean useGroqFirst = new AtomicBoolean(true);
+
+    @SneakyThrows
     @Override
     public JdAnalysisResponse analyzeJobDescription(String jobDescriptionText) {
-        
-        // 1. Fetch live topics from the database
-        String availableTopics = topicRepository.findAll()
-                .stream()
-                .map(Topic::getName)
-                .collect(Collectors.joining(", "));
+        Map<QuestionType, List<String>> topicMap = questionService.getAvailableTopicsMap();
+        String topicsJson = new ObjectMapper().writeValueAsString(topicMap);
 
         String promptTemplate = aiProperties.getPrompts().getJdAnalysis();
         if (promptTemplate == null || promptTemplate.isEmpty()) {
             throw new IllegalStateException("AI Prompt is missing! Check application.yml indentation.");
         }
 
-        // 2. Format the prompt using the properties class
-        String finalSystemPrompt = String.format(aiProperties.getPrompts().getJdAnalysis(), availableTopics);
+        String finalSystemPrompt = String.format(promptTemplate, topicsJson);
 
-        // 3. Build the request using the nested Groq properties
-        GroqChatRequest request = GroqChatRequest.builder()
-                .model(aiProperties.getGroq().getModel())
-                .temperature(aiProperties.getGroq().getTemperature())
-                .max_completion_tokens(aiProperties.getGroq().getMaxTokens())
-                .top_p(aiProperties.getGroq().getTopP())
-                .reasoning_effort(aiProperties.getGroq().getReasoningEffort())
-                .stream(false) 
-                .messages(List.of(
-                        new GroqMessage("system", finalSystemPrompt),
-                        new GroqMessage("user", "Job Description: \n" + jobDescriptionText)
-                ))
-                .build();
+        // ROUND-ROBIN TOGGLE
+        boolean currentStrategyIsGroqFirst = useGroqFirst.getAndSet(!useGroqFirst.get()); // Flip for the next request
 
-        String bearerAuth = "Bearer " + groqApiKey;
-        GroqChatResponse response = groqApiClient.getChatCompletion(bearerAuth, request);
+        // EXECUTE STRATEGY
+        if (currentStrategyIsGroqFirst) {
+            return executeGroqPrimary(finalSystemPrompt, jobDescriptionText);
+        } else {
+            return executeCerebrasPrimary(finalSystemPrompt, jobDescriptionText);
+        }
+    }
 
-        String jsonResult = response.getChoices().get(0).getMessage().getContent();
-        
-        // Failsafe cleanup for markdown wrappers
-        jsonResult = jsonResult.replaceAll("```json", "").replaceAll("```", "").trim();
-
+    private JdAnalysisResponse executeGroqPrimary(String systemPrompt, String jdText) {
         try {
-            return objectMapper.readValue(jsonResult, JdAnalysisResponse.class);
+            return callGroq(systemPrompt, jdText);
         } catch (Exception e) {
-            log.error("Failed to parse Groq JSON response: {}", jsonResult, e);
-            throw new RuntimeException("AI returned invalid JSON format. Please try again.");
+            log.warn("Groq primary failed ({}). Attempting Gemini fallback...", e.getMessage());
+            // If this also fails, it will bubble up automatically to the scheduler
+            try {
+                return callCerebrasFallback(systemPrompt, jdText);
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+    }
+
+    private JdAnalysisResponse executeCerebrasPrimary(String systemPrompt, String jdText) {
+        try {
+            return callCerebrasFallback(systemPrompt, jdText);
+        } catch (Exception e) {
+            log.warn("Cerebras primary failed ({}). Attempting Groq fallback...", e.getMessage());
+            try {
+                return callGroq(systemPrompt, jdText);
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+    }
+
+    private JdAnalysisResponse callGroq(String systemPrompt, String jdText) throws Exception {
+        if (!aiLimitSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
+            throw new RuntimeException("AI provider is currently at max capacity (rate limit protected).");
+        }
+        try {
+            GroqChatRequest request = GroqChatRequest.builder()
+                    .model(aiProperties.getGroq().getModel())
+                    .temperature(aiProperties.getGroq().getTemperature())
+                    .max_completion_tokens(aiProperties.getGroq().getMaxTokens())
+                    .top_p(aiProperties.getGroq().getTopP())
+                    .reasoning_effort(aiProperties.getGroq().getReasoningEffort())
+                    .stream(false)
+                    .messages(List.of(
+                            new GroqMessage("system", systemPrompt),
+                            new GroqMessage("user", "Job Description: \n" + jdText)
+                    ))
+                    .build();
+
+            String bearerAuth = "Bearer " + groqApiKey;
+            GroqChatResponse response = groqApiClient.getChatCompletion(bearerAuth, request);
+            String jsonResult = response.getChoices().get(0).getMessage().getContent()
+                    .replaceAll("```json", "").replaceAll("```", "").trim();
+
+            return objectMapper.readValue(jsonResult, JdAnalysisResponse.class);
+        }
+        finally {
+            aiLimitSemaphore.release();
+        }
+    }
+
+    private JdAnalysisResponse callCerebrasFallback(String systemPrompt, String jdText) throws Exception {
+        if (!aiLimitSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
+            throw new RuntimeException("AI provider is currently at max capacity (rate limit protected).");
+        }
+        try {
+            String fullPrompt = systemPrompt + "\n\nJob Description:\n" + jdText;
+
+            CerebrasChatRequest request = CerebrasChatRequest.builder()
+                    .model(aiProperties.getCerebras().getModel())
+                    .maxCompletionTokens(aiProperties.getCerebras().getMaxTokens())
+                    .temperature(aiProperties.getCerebras().getTemperature())
+                    .topP(aiProperties.getCerebras().getTopP())
+                    .stream(false)
+                    .reasoningEffort(aiProperties.getCerebras().getReasoningEffort())
+                    .messages(List.of(
+                            CerebrasChatRequest.Message.builder()
+                                    .role("user")
+                                    .content(fullPrompt)
+                                    .build()
+                    ))
+                    .build();
+
+            // Format the token properly for the Authorization header
+            String authHeader = "Bearer " + cerebrasApiKey;
+
+            CerebrasChatResponse response = cerebrasApiClient.generateContent(authHeader, request);
+
+            // Extract the JSON string from the nested OpenAI-compatible response
+            String jsonResult = response.getChoices().get(0).getMessage().getContent();
+
+            // Clean markdown blocks just in case the model wraps the output
+            jsonResult = jsonResult.replaceAll("```json", "").replaceAll("```", "").trim();
+
+            return objectMapper.readValue(jsonResult, JdAnalysisResponse.class);
+
+        } finally {
+            aiLimitSemaphore.release();
         }
     }
 
@@ -113,7 +220,7 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
                 // SPAM DETECTED!
                 log.warn("Junk JD detected for user {}. Deleting from queue.", job.getUserId());
                 jdAnalysisQueueRepository.delete(job); // Delete the scrap
-                emailService.sendSpamRejectionEmail(user.getEmail(), plan.getFailureMessage()); // Send rejection mail
+                emailService.sendSpamRejectionEmail(user.getEmail(), plan.getFailureMessage()); // Send re jection mail
                 return;
             }
 
@@ -126,13 +233,22 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
 
             // 3. SUCCESS: Delete from queue and notify user
             jdAnalysisQueueRepository.delete(job);
-            emailService.sendDashboardReadyEmail(user.getEmail(), "https://learnin-prep.vercel.app/dashboard");
+            emailService.sendDashboardReadyEmail(user.getEmail(), frontendUrl);
 
         } catch (Exception e) {
-            // 4. API FAILED (Traffic/Timeout): Mark as FAILED to retry later
-            log.error("AI API failed for user {}. Marking for retry.", job.getUserId(), e);
-            job.setStatus("FAILED");
-            jdAnalysisQueueRepository.save(job);
+            log.error("AI API failed for user {}. Status: {}", job.getUserId(), job.getStatus());
+
+            if ("FAILED".equals(job.getStatus()) || job.getRetryCount() >= 1) {
+                // 2nd Failure or already retried: Give up and notify user
+                jdAnalysisQueueRepository.delete(job);
+                emailService.sendFailedRejectionEmail(userService.findById(job.getUserId()).getEmail());
+                recreditUserQuota(job.getUserId());
+            } else {
+                // 1st Failure: Increment count and mark as FAILED for the scheduler
+                job.setStatus("FAILED");
+                job.setRetryCount(job.getRetryCount() + 1);
+                jdAnalysisQueueRepository.save(job);
+            }
         }
     }
 
@@ -140,14 +256,25 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
     public JdAnalysisResponse getLatestPlan(String userId) {
         return aiJdPlanRepository.findTopByUserIdOrderByCreatedAtDesc(userId)
                 .map(AiJdPlan::getPlanData)
+                .map(jdPlan -> {
+                    if (jdPlan.getRadarData() != null) {
+                        jdPlan.getRadarData().sort(Comparator.comparing(JdAnalysisResponse.RadarItem::getLevel));
+                    }
+                    return jdPlan;
+                })
                 .orElse(null); // Return null if no plan exists
     }
 
     @Override
     public void submitJdForAnalysis(String userId, String jdText) {
+
+        if (jdAnalysisQueueRepository.existsByUserIdAndStatusIn(userId, List.of("PENDING", "FAILED"))) {
+            throw new IllegalStateException("You already have an analysis request in the queue. Please wait for it to be processed.");
+        }
+
         // 1. Backend Character Limit Check (Point 5)
-        if (jdText == null || jdText.trim().length() < 200 || jdText.trim().length() > 8000) {
-            throw new IllegalArgumentException("Job Description must be between 200 and 8000 characters.");
+        if (jdText == null || jdText.trim().length() < minJdsize || jdText.trim().length() > maxJdsize) {
+            throw new IllegalArgumentException("Job Description must be between 200 and 2000 characters.");
         }
 
         // 2. Check Daily Quota (Point 4)
@@ -180,5 +307,15 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
         job.setJdText(jdText);
         job.setCreatedAt(LocalDateTime.now());
         queueRepository.save(job);
+    }
+
+    private void recreditUserQuota(String userId) {
+        quotaRepository.findById(userId).ifPresent(quota -> {
+            if (quota.getRequestsToday() > 0) {
+                quota.setRequestsToday(quota.getRequestsToday() - 1);
+                quotaRepository.save(quota);
+                log.info("Quota re-credited for user: {}", userId);
+            }
+        });
     }
 }

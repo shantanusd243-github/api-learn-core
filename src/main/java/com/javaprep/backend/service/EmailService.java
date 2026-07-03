@@ -5,4 +5,5 @@ public interface EmailService {
     void sendPasswordResetEmail(String to, String resetLink);
     void sendDashboardReadyEmail(String to, String dashboardUrl);
     void sendSpamRejectionEmail(String to, String reason);
+    void sendFailedRejectionEmail(String to);
 }
