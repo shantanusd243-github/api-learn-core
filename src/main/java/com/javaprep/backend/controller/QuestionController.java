@@ -37,18 +37,19 @@ public class QuestionController {
             @RequestParam(required = false) String tag,
             @RequestParam(required = false) String company,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String week, // <--- ADDED THIS
+            @RequestParam(required = false) String week,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable;
-        if (QuestionType.THEORY.equals(type)) {
+        if (QuestionType.THEORY.equals(type) || QuestionType.SYSTEM_DESIGN.equals(type)) {
             pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "topic"));
+        } else if (QuestionType.DSA.equals(type)) {
+            pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "category"));
         } else {
             pageable = PageRequest.of(page, size);
         }
 
-        // <--- ADDED 'week' TO THE SERVICE CALL BELOW
         var result = questionService.search(type, topic, category, difficulty, priority, tag, company, search, week, pageable, currentUserIdOrNull());
 
         return ResponseEntity.ok(PageResponse.from(result));

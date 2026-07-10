@@ -102,7 +102,7 @@ public class JdAnalysisServiceImpl implements JdAnalysisService {
             throw new IllegalStateException("AI Prompt is missing! Check application.yml indentation.");
         }
 
-        String finalPrompt = String.format(promptTemplate, topicsJson, jobDescriptionText);
+        String finalPrompt = String.format(promptTemplate, topicsJson, jobDescriptionText, topicsJson);
 
         // ROUND-ROBIN TOGGLE
         boolean currentStrategyIsGroqFirst = useGroqFirst.getAndSet(!useGroqFirst.get()); // Flip for the next request

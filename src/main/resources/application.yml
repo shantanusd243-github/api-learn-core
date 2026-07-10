@@ -90,6 +90,8 @@ app:
         FORBIDDEN: vague lines like "Drive performance optimization" or "Lead a team".
         ALLOWED: "Requires GCP experience (Cloud Datastore, Pub/Sub)", "Expected to lead incident RCA for production systems"
     
+        Adding valid topic mapping again so you don't hallucinate and give wrong mapping
+        %s
         === NOW GENERATE THE JSON ===
     groq:
       model: "openai/gpt-oss-120b"
