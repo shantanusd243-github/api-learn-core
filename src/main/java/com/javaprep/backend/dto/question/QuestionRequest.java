@@ -2,6 +2,7 @@ package com.javaprep.backend.dto.question;
 
 import com.javaprep.backend.entity.QuestionStatus;
 import com.javaprep.backend.entity.QuestionType;
+import com.javaprep.backend.enums.Priority;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -25,7 +26,7 @@ public class QuestionRequest {
 
     private String topic;
     private String category;
-    private String priority;
+    private Priority priority;
     private String difficulty;
     private List<String> tags;
     private List<String> companyAskedIn;

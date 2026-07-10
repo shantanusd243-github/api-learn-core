@@ -3,6 +3,7 @@ package com.javaprep.backend.dto.question;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.javaprep.backend.entity.QuestionStatus;
 import com.javaprep.backend.entity.QuestionType;
+import com.javaprep.backend.enums.Priority;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,7 +33,7 @@ public class QuestionResponse {
     // Common
     private String topic;
     private String category;
-    private String priority;
+    private Priority priority;
     private String difficulty;
     private List<String> tags;
     private List<String> companyAskedIn;

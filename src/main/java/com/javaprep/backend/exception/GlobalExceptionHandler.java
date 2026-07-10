@@ -87,4 +87,10 @@ public class GlobalExceptionHandler {
                 .build();
         return ResponseEntity.status(status).body(body);
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> handleIllegalState(IllegalStateException e) {
+        // Return a 409 Conflict status because the resource (queue) is busy
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
 }

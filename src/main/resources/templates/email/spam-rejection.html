@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+        .header {
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+        .header h2 {
+            color: #0f172a;
+            margin: 0;
+            font-size: 20px;
+        }
+        .content {
+            font-size: 16px;
+            color: #475569;
+        }
+        .warning-box {
+            background-color: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 16px;
+            margin: 24px 0;
+            border-radius: 0 8px 8px 0;
+            color: #991b1b;
+        }
+        .reason-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .reason-text {
+            font-size: 15px;
+            margin: 0;
+        }
+        .footer {
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid #f1f5f9;
+            font-size: 14px;
+            color: #94a3b8;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2>☕ LearnIn Prep</h2>
+    </div>
+    <div class="content">
+        <p>Hello,</p>
+        <p>We received your request to analyze a Job Description and generate an attack plan, but our AI engine was unable to process the text you provided.</p>
+
+        <div class="warning-box">
+            <div class="reason-title">Reason for Rejection:</div>
+            <p class="reason-text" th:text="${reason}">The provided text does not appear to be a valid Job Description.</p>
+        </div>
+
+        <p>To get a highly accurate interview plan, please ensure you are copying and pasting the <strong>full, unedited text</strong> of a standard job posting (including requirements, tech stack, and responsibilities).</p>
+
+    </div>
+    <div class="footer">
+        <p>&copy; LearnIn Prep. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>

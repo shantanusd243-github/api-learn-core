@@ -64,6 +64,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/progress/summary").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/dashboard/analyze-jd").permitAll()
                         // Admin-only
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/topics", "/api/tags", "/api/companies").hasRole("ADMIN")

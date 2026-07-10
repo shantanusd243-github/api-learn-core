@@ -4,6 +4,7 @@ import com.javaprep.backend.dto.question.QuestionRequest;
 import com.javaprep.backend.dto.question.QuestionResponse;
 import com.javaprep.backend.entity.Question;
 import com.javaprep.backend.entity.QuestionType;
+import com.javaprep.backend.enums.Priority;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -14,7 +15,7 @@ public interface QuestionService {
 
     QuestionResponse getById(String id, String currentUserIdOrNull);
 
-    Page<QuestionResponse> search(QuestionType type, String topic, String category, String difficulty, String priority, String tag, String company, String search, String week, Pageable pageable, String userId);
+    Page<QuestionResponse> search(QuestionType type, String topic, String category, String difficulty, Priority priority, String tag, String company, String search, String week, Pageable pageable, String userId);
 
     List<QuestionResponse> findByTag(String tag);
 
@@ -37,4 +38,6 @@ public interface QuestionService {
     void clearGlobalQuestionCache();
 
     List<Question> getAllQuestionsForCache();
+
+    Map<QuestionType, List<String>> getAvailableTopicsMap();
 }
