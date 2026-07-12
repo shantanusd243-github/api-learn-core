@@ -46,7 +46,7 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
-        return ResponseEntity.ok(authService.googleLogin(request.getIdToken()));
+        return ResponseEntity.ok(authService.googleLogin(request.getCode()));
     }
 
     @PostMapping("/forgot-password")
