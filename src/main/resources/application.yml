@@ -12,6 +12,11 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI}
+  oauth2:
+    linkedin:
+      client-id: ${LINKEDIN_CLIENT_ID}
+      client-secret: ${LINKEDIN_CLIENT_SECRET}
+      redirect-uri: ${LINKEDIN_REDIRECT_URI}
 
   jackson:
     default-property-inclusion: non_null
