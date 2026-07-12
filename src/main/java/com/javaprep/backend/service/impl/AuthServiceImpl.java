@@ -4,8 +4,11 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.javaprep.backend.client.LinkedInApiClient;
+import com.javaprep.backend.client.LinkedInAuthClient;
 import com.javaprep.backend.config.AdminBootstrapProperties;
 import com.javaprep.backend.dto.auth.AuthResponse;
+import com.javaprep.backend.dto.auth.LinkedInLoginRequest;
 import com.javaprep.backend.dto.auth.LoginRequest;
 import com.javaprep.backend.dto.auth.RegisterRequest;
 import com.javaprep.backend.entity.PasswordResetToken;
@@ -31,6 +34,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,6 +47,17 @@ public class AuthServiceImpl implements AuthService {
     private final AdminBootstrapProperties adminBootstrapProperties;
     private final PasswordResetTokenRepository tokenRepository;
     private final EmailService emailService;
+    private final LinkedInAuthClient linkedInAuthClient;
+    private final LinkedInApiClient linkedInApiClient;
+
+    @Value("${spring.oauth2.linkedin.client-id}")
+    private String linkedinClientId;
+
+    @Value("${spring.oauth2.linkedin.client-secret}")
+    private String linkedinClientSecret;
+
+    @Value("${spring.oauth2.linkedin.redirect-uri}")
+    private String linkedinRedirectUri;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -251,5 +266,72 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new InvalidCredentialsException("Google authentication failed");
         }
+    }
+
+    @Override
+    public AuthResponse loginWithLinkedIn(LinkedInLoginRequest request) {
+
+        // 1. Get Access Token via Feign
+        Map<String, Object> tokenResponse;
+        try {
+            tokenResponse = linkedInAuthClient.getAccessToken(
+                    "authorization_code",
+                    request.getCode(),
+                    linkedinClientId,
+                    linkedinClientSecret,
+                    linkedinRedirectUri
+            );
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Invalid LinkedIn authorization code.");
+        }
+
+        String accessToken = (String) tokenResponse.get("access_token");
+
+        // 2. Fetch User Profile via Feign
+        Map<String, Object> userInfo;
+        try {
+            userInfo = linkedInApiClient.getUserProfile("Bearer " + accessToken);
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Failed to fetch user profile from LinkedIn.");
+        }
+
+        String email = (String) userInfo.get("email");
+        String name = (String) userInfo.get("name");
+
+        if (email == null) {
+            throw new InvalidCredentialsException("Failed to retrieve email from LinkedIn.");
+        }
+
+        // 3. Find or Create User
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = new User();
+            newUser.setEmail(email);
+            newUser.setName(name);
+            newUser.setRoles(Collections.singleton(Role.USER));
+            return userRepository.save(newUser);
+        });
+
+        // 4. Generate local JWT
+        String jwtToken = jwtService.generateAccessToken(user.getId(), user.getEmail(),
+                user.getRoles().stream().map(Enum::name).collect(Collectors.toSet()));
+        String refreshToken = jwtService.generateRefreshToken(user.getId());
+
+        AuthResponse.UserSummary userSummary = AuthResponse.UserSummary.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .roles(user.getRoles().stream()
+                        .map(Role::name)
+                        .collect(Collectors.toSet()))
+                .build();
+
+        // 5. Return AuthResponse matching your exact DTO structure
+        return AuthResponse.builder()
+                .accessToken(jwtToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresInMs(jwtService.getRefreshTokenExpirationMs())
+                .user(userSummary)
+                .build();
     }
 }

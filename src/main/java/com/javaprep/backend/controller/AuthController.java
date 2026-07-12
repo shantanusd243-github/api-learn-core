@@ -62,4 +62,10 @@ public class AuthController {
         // Returning a simple JSON map for success
         return ResponseEntity.ok(Map.of("message", "Password updated successfully."));
     }
+
+    @PostMapping("/linkedin")
+    public ResponseEntity<AuthResponse> linkedinLogin(@Valid @RequestBody LinkedInLoginRequest request) {
+        AuthResponse response = authService.loginWithLinkedIn(request);
+        return ResponseEntity.ok(response);
+    }
 }

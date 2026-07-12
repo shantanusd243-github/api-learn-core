@@ -1,6 +1,7 @@
 package com.javaprep.backend.service;
 
 import com.javaprep.backend.dto.auth.AuthResponse;
+import com.javaprep.backend.dto.auth.LinkedInLoginRequest;
 import com.javaprep.backend.dto.auth.LoginRequest;
 import com.javaprep.backend.dto.auth.RegisterRequest;
 
@@ -13,4 +14,5 @@ public interface AuthService {
     void forgotPassword(String email);
     void resetPassword(String token, String newPassword);
     AuthResponse googleLogin(String idTokenString);
+    AuthResponse loginWithLinkedIn(LinkedInLoginRequest request);
 }
