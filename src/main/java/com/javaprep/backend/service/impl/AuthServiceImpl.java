@@ -4,6 +4,8 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.javaprep.backend.client.GoogleApiClient;
+import com.javaprep.backend.client.GoogleAuthClient;
 import com.javaprep.backend.client.LinkedInApiClient;
 import com.javaprep.backend.client.LinkedInAuthClient;
 import com.javaprep.backend.config.AdminBootstrapProperties;
@@ -49,6 +51,17 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final LinkedInAuthClient linkedInAuthClient;
     private final LinkedInApiClient linkedInApiClient;
+    private final GoogleAuthClient googleAuthClient;
+    private final GoogleApiClient googleApiClient;
+
+    @Value("${spring.oauth2.google.client-id}")
+    private String googleClientId;
+
+    @Value("${spring.oauth2.google.client-secret}")
+    private String googleClientSecret;
+
+    @Value("${spring.oauth2.google.redirect-uri}")
+    private String googleRedirectUri;
 
     @Value("${spring.oauth2.linkedin.client-id}")
     private String linkedinClientId;
@@ -61,9 +74,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
-
-    @Value("${app.google.client-id}")
-    private String googleClientId;
 
     @Override
     @Transactional
@@ -230,42 +240,53 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthResponse googleLogin(String idTokenString) {
+    public AuthResponse googleLogin(String code) { // Notice we accept 'code' now
+        // 1. Get Access Token via Feign
+        Map<String, Object> tokenResponse;
         try {
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
-                    .setAudience(Collections.singletonList(googleClientId))
-                    .build();
-
-            GoogleIdToken idToken = verifier.verify(idTokenString);
-            if (idToken == null) throw new InvalidCredentialsException("Invalid Google Token");
-
-            GoogleIdToken.Payload payload = idToken.getPayload();
-            String email = payload.getEmail();
-            String name = (String) payload.get("name");
-
-            // Find existing user in Mongo, or create a new one
-            User user = userRepository.findByEmail(email).orElseGet(() -> {
-                User newUser = new User();
-                newUser.setEmail(email);
-
-                // FIXED: Using setName and setRoles to match your User entity
-                newUser.setName(name);
-                newUser.setRoles(Collections.singleton(Role.USER));
-                newUser.setEnabled(true);
-                newUser.setCreatedAt(Instant.now());
-
-                // Assign a random 128-bit UUID as a password so they can't log in via normal email/password
-                newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
-                return userRepository.save(newUser);
-            });
-
-            // FIXED: We just reuse your amazing issueTokens method directly!
-            // This handles creating the access token, the refresh token, AND hashing it into the database!
-            return issueTokens(user);
-
+            tokenResponse = googleAuthClient.getAccessToken(
+                    "authorization_code",
+                    code,
+                    googleClientId,
+                    googleClientSecret,
+                    googleRedirectUri
+            );
         } catch (Exception e) {
-            throw new InvalidCredentialsException("Google authentication failed");
+            throw new InvalidCredentialsException("Invalid Google authorization code.");
         }
+
+        String accessToken = (String) tokenResponse.get("access_token");
+
+        // 2. Fetch User Profile via Feign
+        Map<String, Object> userInfo;
+        try {
+            userInfo = googleApiClient.getUserProfile("Bearer " + accessToken);
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Failed to fetch user profile from Google.");
+        }
+
+        String email = (String) userInfo.get("email");
+        String name = (String) userInfo.get("name");
+
+        if (email == null) {
+            throw new InvalidCredentialsException("Failed to retrieve email from Google.");
+        }
+
+        // 3. Find or Create User
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = new User();
+            newUser.setEmail(email);
+            newUser.setName(name);
+            newUser.setRoles(Collections.singleton(Role.USER));
+            newUser.setEnabled(true);
+            newUser.setCreatedAt(Instant.now());
+            // Assign a random 128-bit UUID as a password so they can't log in via normal email/password
+            newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+            return userRepository.save(newUser);
+        });
+
+        // 4. Generate and return local JWTs
+        return issueTokens(user);
     }
 
     @Override
