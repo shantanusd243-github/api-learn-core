@@ -3,6 +3,7 @@ package com.javaprep.backend.config;
 import com.javaprep.backend.security.JwtAuthenticationFilter;
 import com.javaprep.backend.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,6 +33,9 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final CorsProperties corsProperties;
 
+    @Value("#{'${role.analyze-jd:ADMIN}'.split(',')}")
+    private List<String> analyzeJdRoles;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -48,7 +52,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
+        HttpSecurity httpSecurity = http
                 .csrf(csrf -> csrf.disable()) // stateless JWT API, no cookies involved
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -64,7 +68,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/progress/summary").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/dashboard/analyze-jd").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/dashboard/analyze-jd").hasAnyRole(analyzeJdRoles.toArray(new String[0]))
                         // Admin-only
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/topics", "/api/tags", "/api/companies").hasRole("ADMIN")
