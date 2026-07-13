@@ -147,3 +147,5 @@ cerebras:
   api:
     url: ${CEREBRAS_API_URL:https://api.cerebras.ai}
     key: ${CEREBRAS_API_KEY}
+role:
+  analyze-jd: ${ROLE_ANALYZE_JD}
