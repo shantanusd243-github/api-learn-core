@@ -4,6 +4,7 @@ import com.javaprep.backend.entity.Question;
 import com.javaprep.backend.entity.QuestionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.List;
 
 public interface QuestionSearchRepository {
 
@@ -20,7 +21,9 @@ public interface QuestionSearchRepository {
             String tag,
             String company,
             String searchText,
-            String week,      // <--- ADD THIS LINE
+            String week,
             Pageable pageable
     );
+
+    List<Question> getRandomFilteredQuestions(int count, String topicId, String companyId, String difficulty);
 }

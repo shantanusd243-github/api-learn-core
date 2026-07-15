@@ -1,5 +1,6 @@
 package com.javaprep.backend.dto.mock;
 
+import com.javaprep.backend.entity.Question;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class MockSessionResponse {
     private String id;
+    private List<Question> questions;
     private List<AnswerRecord> answers;
     private int confidentCount;
     private int weakCount;
