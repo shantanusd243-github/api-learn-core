@@ -3,12 +3,24 @@ server:
 
 spring:
   application:
-    name: Learnin prep
+    name: LearnIn Prep
   domain:
     url: ${DOMAIN_URL}
+  brevo:
+    mail:
+      username: ${SMTP_USERNAME}
+      password: ${SMTP_PASSWORD}
   mail:
-    username: ${SMTP_USERNAME}
-    password: ${SMTP_PASSWORD}
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME_LOCAL}
+    password: ${SMTP_PASSWORD_LOCAL}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   data:
     mongodb:
       uri: ${MONGODB_URI}

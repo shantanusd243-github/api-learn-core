@@ -8,6 +8,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.aggregation.SampleOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -73,7 +77,6 @@ public class QuestionRepositoryImpl implements QuestionSearchRepository {
             criteriaList.add(Criteria.where("companyAskedIn").regex(Pattern.quote(company), "i"));
         }
 
-        // <--- 2. ADDED WEEK FILTER CRITERIA HERE
         if (StringUtils.hasText(week)) {
             criteriaList.add(Criteria.where("week").regex(Pattern.quote(week), "i"));
         }
@@ -100,5 +103,43 @@ public class QuestionRepositoryImpl implements QuestionSearchRepository {
         List<Question> results = mongoTemplate.find(query, Question.class);
 
         return new PageImpl<>(results, pageable, total);
+    }
+
+    @Override
+    public List<Question> getRandomFilteredQuestions(int count, String topic, String company, String difficulty) {
+        List<Criteria> criteriaList = new ArrayList<>();
+
+        // 1. MUST ONLY PULL PUBLISHED QUESTIONS (Crucial for mock interviews)
+        criteriaList.add(Criteria.where("status").is(QuestionStatus.PUBLISHED));
+
+        // 2. Fix the field names to match your schema
+        if (StringUtils.hasText(topic)) {
+            if(!topic.equalsIgnoreCase("DSA") && !topic.equalsIgnoreCase("System Design"))
+            {
+                criteriaList.add(Criteria.where("topic").regex(Pattern.quote(topic), "i"));
+            }
+            else if(topic.equalsIgnoreCase("DSA")){
+                criteriaList.add(Criteria.where("questionType").regex(Pattern.quote("DSA"), "i"));
+            }
+            else if(topic.equalsIgnoreCase("System Design")){
+                criteriaList.add(Criteria.where("questionType").regex(Pattern.quote("SYSTEM_DESIGN"), "i"));
+            }
+
+        }
+        if (StringUtils.hasText(company)) {
+            criteriaList.add(Criteria.where("companyAskedIn").regex(Pattern.quote(company), "i"));
+        }
+        if (StringUtils.hasText(difficulty)) {
+            criteriaList.add(Criteria.where("difficulty").regex(Pattern.quote(difficulty), "i"));
+        }
+
+        // 3. Assemble the query
+        MatchOperation matchOperation = Aggregation.match(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
+        SampleOperation sampleOperation = Aggregation.sample(count);
+
+        Aggregation aggregation = Aggregation.newAggregation(matchOperation, sampleOperation);
+        AggregationResults<Question> results = mongoTemplate.aggregate(aggregation, "questions", Question.class);
+
+        return results.getMappedResults();
     }
 }

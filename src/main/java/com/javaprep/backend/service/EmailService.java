@@ -6,4 +6,5 @@ public interface EmailService {
     void sendDashboardReadyEmail(String to, String dashboardUrl);
     void sendSpamRejectionEmail(String to, String reason);
     void sendFailedRejectionEmail(String to);
+    void sendPromotionalEmailSmtp(String toEmail, String subject, String htmlContent);
 }

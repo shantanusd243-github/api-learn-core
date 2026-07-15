@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/mock-interview")
+@RequestMapping("/api/mock-interviews")
 @RequiredArgsConstructor
 public class MockInterviewController {
 
@@ -33,5 +33,21 @@ public class MockInterviewController {
     @GetMapping("/history")
     public ResponseEntity<List<MockSessionResponse>> history() {
         return ResponseEntity.ok(mockInterviewService.history(CurrentUser.id()));
+    }
+
+    @PostMapping("/start")
+    public ResponseEntity<MockSessionResponse> startMockInterview(
+            @RequestParam(required = false) String topicId,
+            @RequestParam(required = false) String companyId,
+            @RequestParam(required = false) String difficulty) {
+
+        MockSessionResponse response = mockInterviewService.createSession(
+                CurrentUser.id(),
+                topicId,
+                companyId,
+                difficulty
+        );
+
+        return ResponseEntity.ok(response);
     }
 }

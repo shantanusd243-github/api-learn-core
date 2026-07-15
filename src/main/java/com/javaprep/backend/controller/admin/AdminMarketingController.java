@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.thymeleaf.TemplateEngine;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +34,7 @@ public class AdminMarketingController {
     private Resource promoTemplateResource;
 
     private String promoTemplate;
-    private final String PROMO_SUBJECT = "Got 10 minutes today? (Or you gonna choke in the next interview too?)";
+    private final String PROMO_SUBJECT = "have you actually practiced saying your answer out loud?";
 
     @PostConstruct
     public void loadTemplate() {
@@ -95,4 +96,31 @@ public class AdminMarketingController {
 
         return ResponseEntity.ok("Marketing blast completed. Successfully sent to " + successCount + " users.");
     }
+
+    /**
+     * DANGER: This will send an email to EVERY user in the database.
+     * Ensure this endpoint is secured behind Admin role checks.
+     */
+    @PostMapping("/send-promo-smtp")
+    public ResponseEntity<String> sendPromoBlastSMTP() {
+        List<User> users = userRepository.findAll();
+        int successCount = 0;
+
+        for (User user : users) {
+            try {
+                String userName = (user.getName() != null && !user.getName().trim().isEmpty())
+                        ? user.getName()
+                        : "there";
+
+                String personalizedHtml = promoTemplate.replace("{{userName}}", userName);
+                emailService.sendPromotionalEmailSmtp(user.getEmail(), PROMO_SUBJECT, personalizedHtml);
+                successCount++;
+            } catch (Exception e) {
+                log.error("Failed to send promo email to: " + user.getEmail(), e);
+            }
+        }
+
+        return ResponseEntity.ok("Marketing blast completed. Successfully sent to " + successCount + " users.");
+    }
+
 }
